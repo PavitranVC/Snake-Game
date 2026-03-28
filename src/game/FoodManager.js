@@ -3,9 +3,30 @@ import { FOOD_TIERS } from "./constants"
 
 export default class FoodManager {
   constructor(scene) {
-    this.scene = scene
-    this.group = scene.physics.add.group()
+    this.scene    = scene
+    this.group    = scene.physics.add.group()
+    this._pulse   = { scale: 1.0 }   // single shared value all food reads from
     this._buildTextures()
+    this._buildSharedPulseTween()
+  }
+
+  // One tween drives ALL food orbs — instead of one tween per orb.
+  // Each frame, spawnFood sets the food image's scale from this shared value.
+  _buildSharedPulseTween() {
+    this.scene.tweens.add({
+      targets:  this._pulse,
+      scale:    1.2,
+      duration: 700,
+      yoyo:     true,
+      repeat:   -1,
+      ease:     "Sine.easeInOut",
+      onUpdate: () => {
+        // Apply current pulse scale to every food orb in one pass
+        for (const food of this.group.getChildren()) {
+          food.setScale(this._pulse.scale)
+        }
+      },
+    })
   }
 
   _buildTextures() {
@@ -36,30 +57,27 @@ export default class FoodManager {
     })
   }
 
-  spawnFood(x, y) {
-    const tierIndex = this._pickTier()
-    const tier = FOOD_TIERS[tierIndex]
-    const key = `food_${tierIndex}`
+  spawnFood(x, y, forceTier = null) {
+    const tierIndex = forceTier !== null ? forceTier : this._pickTier()
+    const tier      = FOOD_TIERS[tierIndex]
+    const key       = `food_${tierIndex}`
 
     const food = this.scene.add.image(x, y, key)
     food.setDepth(5)
     food.tierIndex = tierIndex
-    food.points = tier.points
+    food.points    = tier.points
 
-    // Pulse tween
-    this.scene.tweens.add({
-      targets: food,
-      scaleX: 1.25,
-      scaleY: 1.25,
-      duration: 600 + Math.random() * 400,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-      delay: Math.random() * 500,
-    })
-
+    // Physics hitbox: use the inner glow radius (tier.radius * 1.4) so
+    // collection feels responsive without being too generous.
+    // The texture is size = radius * 6, centered at size/2.
+    // Arcade circle offset must shift the circle so it sits at the image center:
+    //   offset = (textureHalfSize) - circleRadius
     this.scene.physics.add.existing(food)
-    food.body.setCircle(tier.radius * 3, 0, 0)
+    const textureSize   = tier.radius * 6
+    const hitRadius     = tier.radius * 1.4
+    const centerOffset  = textureSize / 2 - hitRadius
+    food.body.setCircle(hitRadius, centerOffset, centerOffset)
+
     this.group.add(food)
     return food
   }

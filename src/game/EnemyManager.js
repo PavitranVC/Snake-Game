@@ -6,10 +6,6 @@ export default class EnemyManager {
   constructor(scene) {
     this.scene   = scene
     this.enemies = []
-    this._spawnInitial()
-  }
-
-  _spawnInitial() {
     for (let i = 0; i < MAX_ENEMIES; i++) this.spawnEnemy(i)
   }
 
@@ -19,42 +15,39 @@ export default class EnemyManager {
     const x = Phaser.Math.Between(margin, WORLD_SIZE - margin)
     const y = Phaser.Math.Between(margin, WORLD_SIZE - margin)
     const enemy = new EnemySnake(this.scene, x, y, ci)
+
+    // Store the collider on the enemy so we can destroy it when the enemy dies.
+    // Without this, every respawn adds a new collider that accumulates forever.
+    enemy._foodCollider = this.scene.physics.add.overlap(
+      enemy.head,
+      this.scene.foodManager.group,
+      (head, food) => { enemy.grow(); food.destroy() }
+    )
+
     this.enemies.push(enemy)
-    // Register food overlap if foodManager is already available
-    if (this.scene.foodManager) {
-      this.scene.physics.add.overlap(
-        enemy.head,
-        this.scene.foodManager.group,
-        (head, food) => {
-          enemy.grow()
-          food.destroy()
-        }
-      )
-    }
     return enemy
   }
 
-  // Called from SnakeScene after foodManager is ready
+  // Called from SnakeScene after foodManager is initialised
   registerFoodOverlaps() {
-    for (const enemy of this.enemies) {
-      this.scene.physics.add.overlap(
-        enemy.head,
-        this.scene.foodManager.group,
-        (head, food) => {
-          enemy.grow()
-          food.destroy()
-        }
-      )
-    }
+    // Overlaps are registered inside spawnEnemy — kept as no-op for compatibility
   }
 
   update(player) {
+    // Pass the full enemies list so each enemy can reason about others —
+    // hunt smaller ones, flee bigger ones. No extra allocation: we pass
+    // the same array reference that already exists.
     for (const e of this.enemies) {
-      e.update(this.scene.foodManager.group, player)
+      e.update(this.scene.foodManager.group, player, this.enemies)
     }
   }
 
   removeEnemy(enemy) {
+    // Destroy the physics collider before removing the enemy — prevents leak
+    if (enemy._foodCollider) {
+      this.scene.physics.world.removeCollider(enemy._foodCollider)
+      enemy._foodCollider = null
+    }
     this.enemies = this.enemies.filter(e => e !== enemy)
   }
 }
