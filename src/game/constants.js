@@ -9,12 +9,25 @@ export const PLAYER_COLOR      = 0x39ff14   // neon green
 export const PLAYER_GLOW       = "#39ff14"
 export const BASE_SPEED        = 210
 export const BOOST_SPEED       = 380
-export const BOOST_DRAIN       = 1.2        // per frame
-export const BOOST_REGEN       = 0.4        // per frame
+export const BOOST_DRAIN       = 1.8        // energy drained per frame while boosting
+export const BOOST_REGEN       = 0.15       // base energy regen per frame (slow!)
 export const BOOST_MAX         = 100
+export const BOOST_COOLDOWN_MS = 2500       // ms after empty before regen starts
 export const SEGMENT_SPACING   = 10
 export const HEAD_RADIUS       = 13
 export const BODY_RADIUS       = 10
+
+// ─── Powerups ────────────────────────────────────────────────────────────────
+export const POWERUP_TYPES = [
+  { id: "boost_refill",   color: 0x00ffff,  glow: "#00ffff",  radius: 10, label: "⚡", desc: "Instant boost refill"          },
+  { id: "boost_regen",    color: 0xffe600,  glow: "#ffe600",  radius: 10, label: "↑",  desc: "Faster boost regen (10s)"      },
+  { id: "boost_capacity", color: 0xff7c2a,  glow: "#ff7c2a",  radius: 10, label: "◈",  desc: "Bigger boost tank (15s)"       },
+]
+export const POWERUP_SPAWN_INTERVAL = 8000  // ms between powerup spawns
+export const POWERUP_LIFETIME       = 12000 // ms before a powerup disappears
+
+// ─── Mirror world ─────────────────────────────────────────────────────────────
+export const MIRROR_DIST = 400  // px from edge within which ghost copies are drawn
 
 // ─── Enemies ─────────────────────────────────────────────────────────────────
 export const MAX_ENEMIES = 15

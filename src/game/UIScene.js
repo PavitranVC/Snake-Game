@@ -1,5 +1,5 @@
 import Phaser from "phaser"
-import { BOOST_MAX, WORLD_SIZE, PLAYER_COLOR, ENEMY_COLORS } from "./constants"
+import { BOOST_MAX, BOOST_COOLDOWN_MS, WORLD_SIZE, PLAYER_COLOR, ENEMY_COLORS } from "./constants"
 
 const W = 1280
 const H = 720
@@ -24,6 +24,7 @@ export default class UIScene extends Phaser.Scene {
     this._buildPauseButton()
     this._buildPauseScreen()
     this._buildDeathScreen()
+    this._buildPowerupBanner()
 
     // Listen for player death from SnakeScene
     const gameScene = this.scene.get("SnakeScene")
@@ -33,6 +34,12 @@ export default class UIScene extends Phaser.Scene {
 
     // ESC key toggles pause
     this.input.keyboard.on("keydown-ESC", () => this._togglePause())
+
+    // Powerup collection flash
+    const gameScene = this.scene.get("SnakeScene")
+    if (gameScene) {
+      gameScene.events.on("powerupCollected", type => this.flashPowerup(type))
+    }
   }
 
   // Called every frame from SnakeScene._syncUI
@@ -41,6 +48,19 @@ export default class UIScene extends Phaser.Scene {
     this._updateScorePanel()
     this._updateBoostBar()
     this._updateMinimap()
+  }
+
+  // Called when player collects a powerup
+  flashPowerup(type) {
+    const flash = this.add.text(W / 2, H / 2 - 60, type.label + '  ' + type.desc, {
+      fontFamily: "'Orbitron', monospace",
+      fontSize: "18px",
+      color: type.glow,
+      stroke: "#000",
+      strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(55).setAlpha(0)
+    this.tweens.add({ targets: flash, alpha: 1, y: H / 2 - 80, duration: 200 })
+    this.tweens.add({ targets: flash, alpha: 0, y: H / 2 - 100, duration: 400, delay: 1200, onComplete: () => flash.destroy() })
   }
 
   // ─── Score Panel ──────────────────────────────────────────────────────────
@@ -116,22 +136,44 @@ export default class UIScene extends Phaser.Scene {
   }
 
   _updateBoostBar() {
-    const pct = Math.max(0, Math.min(1, this.stats.boost / BOOST_MAX))
+    const boost    = this.stats.boost    || 0
+    const cooldown = this.stats.cooldown || 0
+    const boostMax = this.stats.boostMax || BOOST_MAX
+    const pct      = Math.max(0, Math.min(1, boost / boostMax))
+    const cdPct    = Math.max(0, Math.min(1, cooldown / BOOST_COOLDOWN_MS))
     const bx = this._boostBarX
     const by = this._boostBarY
     const bw = this._boostBarW
     const bh = this._boostBarH
 
     this.boostFill.clear()
-    if (pct > 0) {
-      const color = pct > 0.3 ? 0x39ff14 : 0xff4400
+
+    if (cdPct > 0) {
+      // Cooldown state — show a red shrinking bar representing time until regen
+      this.boostFill.fillStyle(0xff2d00, 0.3)
+      this.boostFill.fillRoundedRect(bx, by, bw * cdPct, bh, 6)
+      // Flashing label
+      const flash = Math.sin(Date.now() / 150) > 0
+      if (flash) {
+        this.boostFill.fillStyle(0xff4400, 0.15)
+        this.boostFill.fillRoundedRect(bx, by, bw, bh, 6)
+      }
+      this.boostLabel.setText("BOOST  COOLDOWN...")
+        .setStyle({ color: "#ff4400" })
+    } else if (pct > 0) {
+      // Normal state
+      const color = pct > 0.3 ? 0x39ff14 : 0xff8800
       this.boostFill.fillStyle(color, 0.9)
       this.boostFill.fillRoundedRect(bx, by, bw * pct, bh, 6)
-      // Glow on full
       if (pct > 0.95) {
         this.boostFill.fillStyle(0x39ff14, 0.2)
         this.boostFill.fillRoundedRect(bx, by, bw, bh, 6)
       }
+      this.boostLabel.setText("BOOST  [SPACE]")
+        .setStyle({ color: "#39ff14" })
+    } else {
+      this.boostLabel.setText("BOOST  EMPTY")
+        .setStyle({ color: "#ff4400" })
     }
   }
 
@@ -326,6 +368,42 @@ export default class UIScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
       paused: true,
+    })
+  }
+
+  // ─── Powerup Banner ──────────────────────────────────────────────────────
+  _buildPowerupBanner() {
+    this.powerupBanner = this.add.text(W / 2, H - 80, "", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize: "14px",
+      color: "#00ffff",
+      stroke: "#000",
+      strokeThickness: 3,
+      backgroundColor: "#001a1a",
+      padding: { x: 16, y: 8 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(30)
+  }
+
+  showPowerup(type) {
+    const labels = {
+      boost_refill:   "⚡ BOOST REFILLED!",
+      boost_regen:    "↑ REGEN BOOST  ×3  for 10s",
+      boost_capacity: "◈ BOOST TANK EXPANDED  for 15s",
+    }
+    const colors = {
+      boost_refill:   "#00ffff",
+      boost_regen:    "#ffe600",
+      boost_capacity: "#ff7c2a",
+    }
+    this.powerupBanner
+      .setText(labels[type.id] || type.id)
+      .setStyle({ color: colors[type.id] || "#ffffff" })
+      .setAlpha(1)
+
+    this.tweens.killTweensOf(this.powerupBanner)
+    this.tweens.add({
+      targets: this.powerupBanner, alpha: 0,
+      duration: 500, delay: 2000,
     })
   }
 

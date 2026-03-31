@@ -36,7 +36,7 @@ export default class FoodManager {
       if (this.scene.textures.exists(key)) return
       const r = tier.radius
       const size = r * 6
-      const g = this.scene.add.graphics()
+      const g = this.scene.add.graphics({ x: -99999, y: -99999 })
       // Outermost glow
       g.fillStyle(tier.color, 0.08)
       g.fillCircle(size / 2, size / 2, r * 2.8)

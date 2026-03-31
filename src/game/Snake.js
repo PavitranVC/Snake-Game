@@ -3,7 +3,7 @@ import SnakeBase from "./SnakeBase"
 import {
   PLAYER_COLOR,
   BASE_SPEED, BOOST_SPEED,
-  BOOST_DRAIN, BOOST_REGEN, BOOST_MAX,
+  BOOST_DRAIN, BOOST_REGEN, BOOST_MAX, BOOST_COOLDOWN_MS,
 } from "./constants"
 
 export default class Snake extends SnakeBase {
@@ -14,16 +14,23 @@ export default class Snake extends SnakeBase {
     this.boostSpeed  = BOOST_SPEED
     this.isBoosting  = false
     this.boostEnergy = BOOST_MAX
+    this.boostMax    = BOOST_MAX       // can be increased by powerup
+
+    // Cooldown: ms remaining before regen is allowed after tank empties
+    this._boostCooldownMs  = 0
+    this._boostOnCooldown  = false
+
+    // Powerup multipliers (reset on death / scene restart)
+    this.regenMultiplier   = 1.0       // boost_regen powerup increases this
+    this._regenPowerupTimer = 0
+    this._capPowerupTimer   = 0
 
     // Input
     this.cursors  = scene.input.keyboard.createCursorKeys()
     this.wasd     = scene.input.keyboard.addKeys({ up: "W", down: "S", left: "A", right: "D" })
     this.boostKey = scene.input.keyboard.addKey("SPACE")
 
-    // Start with 6 body segments
     for (let i = 0; i < 6; i++) this._addBodySegment()
-
-    // Boost trail — single particle emitter, reused every frame
     this._buildTrailEmitter()
   }
 
@@ -50,42 +57,37 @@ export default class Snake extends SnakeBase {
 
   // ─── Per-frame update ─────────────────────────────────────────────────────
 
-  update() {
+  update(delta) {
     this._handleInput()
     this._moveHead()
-    this._updateHistory()   // inherited from SnakeBase
-    this._updateBody()      // inherited from SnakeBase
-    this._updateEyes()      // inherited from SnakeBase
-    this._updateBoost()
+    this._updateHistory()
+    this._updateBody()
+    this._updateEyes()
+    this._updateBoost(delta)
+    this._tickPowerups(delta)
   }
 
   // ─── Input ────────────────────────────────────────────────────────────────
 
   _handleInput() {
     const pointer = this.scene.input.activePointer
-
-    // Mouse steering — getWorldPoint correctly unprojects screen coords
-    // through camera zoom + scroll, which plain math gets wrong
     const world = this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y)
     const dx = world.x - this.head.x
     const dy = world.y - this.head.y
 
     if (Math.sqrt(dx * dx + dy * dy) > 40) {
       const newAngle = Phaser.Math.Angle.RotateTo(
-        this.direction.angle(),
-        Math.atan2(dy, dx),
-        0.09                  // max radians per frame — prevents instant snapping
+        this.direction.angle(), Math.atan2(dy, dx), 0.09
       )
       this.direction.setTo(Math.cos(newAngle), Math.sin(newAngle))
     }
 
-    // Keyboard — additive, works alongside mouse
     if (this.cursors.left.isDown  || this.wasd.left.isDown)  this.direction.rotate(-0.08)
     if (this.cursors.right.isDown || this.wasd.right.isDown) this.direction.rotate( 0.08)
 
-    // Boost trigger — SPACE or right mouse button
     const rmb = pointer.rightButtonDown ? pointer.rightButtonDown() : false
-    this.isBoosting = (this.boostKey.isDown || rmb) && this.boostEnergy > 0
+    // Can't boost while on cooldown
+    this.isBoosting = (this.boostKey.isDown || rmb) && this.boostEnergy > 0 && !this._boostOnCooldown
   }
 
   _moveHead() {
@@ -94,28 +96,84 @@ export default class Snake extends SnakeBase {
     this.head.rotation = this.direction.angle()
   }
 
-  // ─── Boost ────────────────────────────────────────────────────────────────
+  // ─── Boost with cooldown ──────────────────────────────────────────────────
 
-  _updateBoost() {
+  _updateBoost(delta) {
     if (this.isBoosting) {
       this.boostEnergy = Math.max(0, this.boostEnergy - BOOST_DRAIN)
       this.trailEmitter.setPosition(this.head.x, this.head.y)
       this.trailEmitter.explode(2)
+
+      // Tank just hit empty — start cooldown
+      if (this.boostEnergy === 0 && !this._boostOnCooldown) {
+        this._boostOnCooldown = true
+        this._boostCooldownMs = BOOST_COOLDOWN_MS
+      }
     } else {
-      this.boostEnergy = Math.min(BOOST_MAX, this.boostEnergy + BOOST_REGEN)
+      // Count down cooldown
+      if (this._boostOnCooldown) {
+        this._boostCooldownMs -= delta
+        if (this._boostCooldownMs <= 0) {
+          this._boostOnCooldown = false
+          this._boostCooldownMs = 0
+        }
+      } else {
+        // Normal regen — only when not on cooldown
+        const regen = BOOST_REGEN * this.regenMultiplier
+        this.boostEnergy = Math.min(this.boostMax, this.boostEnergy + regen)
+      }
     }
+  }
+
+  // ─── Powerup effects ──────────────────────────────────────────────────────
+
+  applyPowerup(type) {
+    if (type === "boost_refill") {
+      // Instant full refill, clears cooldown
+      this.boostEnergy      = this.boostMax
+      this._boostOnCooldown = false
+      this._boostCooldownMs = 0
+    } else if (type === "boost_regen") {
+      // 3× regen speed for 10 seconds
+      this.regenMultiplier   = 3.0
+      this._regenPowerupTimer = 10000
+    } else if (type === "boost_capacity") {
+      // +50 max capacity for 15 seconds
+      this.boostMax          = BOOST_MAX + 50
+      this._capPowerupTimer  = 15000
+      this.boostEnergy       = Math.min(this.boostEnergy + 50, this.boostMax)
+    }
+  }
+
+  _tickPowerups(delta) {
+    if (this._regenPowerupTimer > 0) {
+      this._regenPowerupTimer -= delta
+      if (this._regenPowerupTimer <= 0) this.regenMultiplier = 1.0
+    }
+    if (this._capPowerupTimer > 0) {
+      this._capPowerupTimer -= delta
+      if (this._capPowerupTimer <= 0) {
+        this.boostMax    = BOOST_MAX
+        this.boostEnergy = Math.min(this.boostEnergy, this.boostMax)
+      }
+    }
+  }
+
+  // Expose powerup state for UI
+  get activePowerup() {
+    if (this._regenPowerupTimer > 0) return { id: "boost_regen",    msLeft: this._regenPowerupTimer }
+    if (this._capPowerupTimer  > 0) return { id: "boost_capacity", msLeft: this._capPowerupTimer  }
+    return null
   }
 
   // ─── Grow ─────────────────────────────────────────────────────────────────
 
-  grow() {
-    this._addBodySegment()  // defined in SnakeBase
-  }
+  grow() { this._addBodySegment() }
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────
 
   destroy() {
-    super.destroy()         // handles head, body segments, eyes
+    super.destroy()
     this.trailEmitter.destroy()
   }
 }

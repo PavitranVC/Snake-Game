@@ -16,27 +16,14 @@ export default class ParticleManager {
   }
 
   _buildTextures() {
-    if (!scene.textures.exists("particle_soft")) {
-      const g = scene.add.graphics()
-      g.fillStyle(0xffffff, 1); g.fillCircle(6, 6, 6)
-      g.generateTexture("particle_soft", 12, 12); g.destroy()
-    }
-    if (!scene.textures.exists("particle_spark")) {
-      const g = scene.add.graphics()
-      g.fillStyle(0xffffff, 1); g.fillRect(0, 2, 10, 2)
-      g.generateTexture("particle_spark", 10, 6); g.destroy()
-    }
-  }
-
-  _buildTextures() {
     const scene = this.scene
     if (!scene.textures.exists("particle_soft")) {
-      const g = scene.add.graphics()
+      const g = scene.add.graphics({ x: -99999, y: -99999 })
       g.fillStyle(0xffffff, 1); g.fillCircle(6, 6, 6)
       g.generateTexture("particle_soft", 12, 12); g.destroy()
     }
     if (!scene.textures.exists("particle_spark")) {
-      const g = scene.add.graphics()
+      const g = scene.add.graphics({ x: -99999, y: -99999 })
       g.fillStyle(0xffffff, 1); g.fillRect(0, 2, 10, 2)
       g.generateTexture("particle_spark", 10, 6); g.destroy()
     }

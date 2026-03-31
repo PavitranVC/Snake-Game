@@ -12,9 +12,11 @@ export default class SnakeBase {
 
   static buildSegmentTexture(scene, key, radius, color) {
     if (scene.textures.exists(key)) return
-    const size = Math.ceil(radius * 4.4)   // fits the outermost glow ring
+    const size = Math.ceil(radius * 4.4)
     const cx = size / 2, cy = size / 2
-    const g = scene.add.graphics()
+    // Place far off-screen so no render artifact appears at world origin
+    // before destroy() is called
+    const g = scene.add.graphics({ x: -99999, y: -99999 })
     g.fillStyle(color, 0.18);  g.fillCircle(cx, cy, radius * 2.2)
     g.fillStyle(color, 0.35);  g.fillCircle(cx, cy, radius * 1.5)
     g.fillStyle(color, 1);     g.fillCircle(cx, cy, radius)
@@ -25,7 +27,7 @@ export default class SnakeBase {
 
   static buildEyeTexture(scene) {
     if (scene.textures.exists("eye_dot")) return
-    const g = scene.add.graphics()
+    const g = scene.add.graphics({ x: -99999, y: -99999 })
     g.fillStyle(0xffffff, 1); g.fillCircle(5, 5, 5)
     g.fillStyle(0x000000, 1); g.fillCircle(6.5, 5, 2.5)
     g.generateTexture("eye_dot", 10, 10)

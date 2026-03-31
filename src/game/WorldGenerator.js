@@ -15,7 +15,7 @@ export default class WorldGenerator {
   _buildGridTexture() {
     if (this.scene.textures.exists("grid_tile")) return
     const size = GRID_CELL
-    const g = this.scene.add.graphics()
+    const g = this.scene.add.graphics({ x: -99999, y: -99999 })
     // Dark fill
     g.fillStyle(0x050a0f, 1)
     g.fillRect(0, 0, size, size)
