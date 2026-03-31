@@ -1,5 +1,5 @@
 import Phaser from "phaser"
-import { WORLD_SIZE } from "./constants"
+import { WORLD_SIZE, BORDER_MARGIN } from "./constants"
 
 const CRITTER_COLORS = [0xfacc15, 0xfb923c, 0xa78bfa, 0x34d399]
 
@@ -24,8 +24,8 @@ export default class AnimalManager {
 
   _spawnCritters(count) {
     for (let i = 0; i < count; i++) {
-      const x = Phaser.Math.Between(100, WORLD_SIZE - 100)
-      const y = Phaser.Math.Between(100, WORLD_SIZE - 100)
+      const x = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
+      const y = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
       const c = this.scene.add.image(x, y, "critter")
       c.setDepth(6)
       c.setTint(Phaser.Math.RND.pick(CRITTER_COLORS))

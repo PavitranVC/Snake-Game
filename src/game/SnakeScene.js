@@ -109,7 +109,7 @@ export default class SnakeScene extends Phaser.Scene {
         for (const part of this.snake.getBodyParts()) {
           const dx = ehx - part.x, dy = ehy - part.y
           if (dx * dx + dy * dy < HIT_SQ_BODY) {
-            this._enemyDie(enemy)
+            this._enemyDie(enemy, true)  // player caused this kill
             break
           }
         }
@@ -181,13 +181,18 @@ export default class SnakeScene extends Phaser.Scene {
     })
   }
 
-  _enemyDie(enemy) {
+  _enemyDie(enemy, byPlayer = false) {
     if (enemy._isDead) return   // guard against double-kill same frame
     enemy._isDead = true
 
-    this.sessionScore += 200
-    this.sessionKills++
-    this.particleManager.killExplosion(enemy.head.x, enemy.head.y, enemy.colorHex)
+    // Only reward the player if THEY caused the kill
+    if (byPlayer) {
+      this.sessionScore += 200
+      this.sessionKills++
+    }
+
+    // Explosion visual always plays, but camera shake only for player kills
+    this.particleManager.killExplosion(enemy.head.x, enemy.head.y, enemy.colorHex, byPlayer)
     this._spawnDeathFood(enemy)
     enemy.destroy()
     this.enemyManager.removeEnemy(enemy)

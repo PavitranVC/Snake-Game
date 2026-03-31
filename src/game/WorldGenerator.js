@@ -1,5 +1,5 @@
 import Phaser from "phaser"
-import { CHUNK_SIZE, RENDER_DIST, WORLD_SIZE, GRID_CELL } from "./constants"
+import { CHUNK_SIZE, RENDER_DIST, WORLD_SIZE, GRID_CELL, BORDER_MARGIN } from "./constants"
 
 export default class WorldGenerator {
   constructor(scene, foodManager) {
@@ -42,12 +42,37 @@ export default class WorldGenerator {
   }
 
   _buildBorderGlow() {
-    // Neon border around world edges
-    const gfx = this.scene.add.graphics().setDepth(1)
-    gfx.lineStyle(6, 0x39ff14, 0.6)
-    gfx.strokeRect(4, 4, WORLD_SIZE - 8, WORLD_SIZE - 8)
-    gfx.lineStyle(2, 0x39ff14, 0.2)
-    gfx.strokeRect(14, 14, WORLD_SIZE - 28, WORLD_SIZE - 28)
+    const W = WORLD_SIZE
+    const VOID = 4000   // how far the void extends beyond each edge (covers any camera view)
+
+    // ── Void panels — solid black rectangles placed outside each world edge ──
+    // They sit at depth 100 so they always render on top of everything in the world.
+    // Four panels: top, bottom, left, right — each extends VOID px beyond the edge.
+    const voidGfx = this.scene.add.graphics().setDepth(100)
+    voidGfx.fillStyle(0x000000, 1)
+    // Top void
+    voidGfx.fillRect(-VOID, -VOID, W + VOID * 2, VOID)
+    // Bottom void
+    voidGfx.fillRect(-VOID, W, W + VOID * 2, VOID)
+    // Left void
+    voidGfx.fillRect(-VOID, 0, VOID, W)
+    // Right void
+    voidGfx.fillRect(W, 0, VOID, W)
+
+    // ── Neon border glow on the inside face of the void ──
+    const gfx = this.scene.add.graphics().setDepth(101)
+    // Thick outer glow
+    gfx.lineStyle(12, 0x39ff14, 0.15)
+    gfx.strokeRect(0, 0, W, W)
+    // Mid glow
+    gfx.lineStyle(6, 0x39ff14, 0.5)
+    gfx.strokeRect(3, 3, W - 6, W - 6)
+    // Sharp inner line
+    gfx.lineStyle(2, 0x39ff14, 1.0)
+    gfx.strokeRect(8, 8, W - 16, W - 16)
+    // Inner warning band — danger zone colour fade
+    gfx.lineStyle(1, 0xff2d78, 0.2)
+    gfx.strokeRect(BORDER_MARGIN, BORDER_MARGIN, W - BORDER_MARGIN * 2, W - BORDER_MARGIN * 2)
   }
 
   update(px, py) {
@@ -80,20 +105,38 @@ export default class WorldGenerator {
       return
     }
 
-    // Spawn food
+    // Clamp spawn area to world interior — nothing within BORDER_MARGIN of any edge
+    const minX = Math.max(sx + 20, BORDER_MARGIN)
+    const maxX = Math.min(sx + CHUNK_SIZE - 20, WORLD_SIZE - BORDER_MARGIN)
+    const minY = Math.max(sy + 20, BORDER_MARGIN)
+    const maxY = Math.min(sy + CHUNK_SIZE - 20, WORLD_SIZE - BORDER_MARGIN)
+
+    // Skip chunk entirely if it falls fully outside the safe zone
+    if (minX >= maxX || minY >= maxY) {
+      this.activeChunks.set(key, objs)
+      return
+    }
+
+    // Spawn food within safe bounds
     const foodCount = Phaser.Math.Between(8, 14)
     for (let i = 0; i < foodCount; i++) {
-      const x = Phaser.Math.Between(sx + 20, sx + CHUNK_SIZE - 20)
-      const y = Phaser.Math.Between(sy + 20, sy + CHUNK_SIZE - 20)
+      const x = Phaser.Math.Between(minX, maxX)
+      const y = Phaser.Math.Between(minY, maxY)
       objs.push(this.foodManager.spawnFood(x, y))
     }
 
-    // Neon rock decorations
-    const rockCount = Phaser.Math.Between(0, 3)
-    for (let i = 0; i < rockCount; i++) {
-      const rx = Phaser.Math.Between(sx + 40, sx + CHUNK_SIZE - 40)
-      const ry = Phaser.Math.Between(sy + 40, sy + CHUNK_SIZE - 40)
-      objs.push(...this._spawnRock(rx, ry))
+    // Neon rock decorations within safe bounds
+    const rockMinX = Math.max(sx + 40, BORDER_MARGIN)
+    const rockMaxX = Math.min(sx + CHUNK_SIZE - 40, WORLD_SIZE - BORDER_MARGIN)
+    const rockMinY = Math.max(sy + 40, BORDER_MARGIN)
+    const rockMaxY = Math.min(sy + CHUNK_SIZE - 40, WORLD_SIZE - BORDER_MARGIN)
+    if (rockMinX < rockMaxX && rockMinY < rockMaxY) {
+      const rockCount = Phaser.Math.Between(0, 3)
+      for (let i = 0; i < rockCount; i++) {
+        const rx = Phaser.Math.Between(rockMinX, rockMaxX)
+        const ry = Phaser.Math.Between(rockMinY, rockMaxY)
+        objs.push(...this._spawnRock(rx, ry))
+      }
     }
 
     this.activeChunks.set(key, objs)

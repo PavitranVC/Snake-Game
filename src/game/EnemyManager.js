@@ -1,6 +1,6 @@
 import Phaser from "phaser"
 import EnemySnake from "./EnemySnake"
-import { MAX_ENEMIES, WORLD_SIZE } from "./constants"
+import { MAX_ENEMIES, WORLD_SIZE, BORDER_MARGIN } from "./constants"
 
 export default class EnemyManager {
   constructor(scene) {
@@ -11,9 +11,8 @@ export default class EnemyManager {
 
   spawnEnemy(colorIndex = null) {
     const ci = colorIndex !== null ? colorIndex : this.enemies.length
-    const margin = 400
-    const x = Phaser.Math.Between(margin, WORLD_SIZE - margin)
-    const y = Phaser.Math.Between(margin, WORLD_SIZE - margin)
+    const x = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
+    const y = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
     const enemy = new EnemySnake(this.scene, x, y, ci)
 
     // Store the collider on the enemy so we can destroy it when the enemy dies.

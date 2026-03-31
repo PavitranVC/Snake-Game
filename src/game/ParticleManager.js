@@ -110,14 +110,15 @@ export default class ParticleManager {
     emitter.explode(8)
   }
 
-  killExplosion(x, y, color) {
+  killExplosion(x, y, color, shake = false) {
     const i    = this._killIdx % this._killSoftPool.length
     this._killIdx++
     const soft  = this._killSoftPool[i]
     const spark = this._killSparkPool[i]
     soft.setPosition(x, y);   soft.setParticleTint(color);  soft.explode(30)
     spark.setPosition(x, y);  spark.setParticleTint(color); spark.explode(15)
-    this.scene.cameras.main.shake(200, 0.012)
+    // Only shake the camera when the PLAYER made the kill
+    if (shake) this.scene.cameras.main.shake(200, 0.012)
   }
 
   deathEffect(x, y) {

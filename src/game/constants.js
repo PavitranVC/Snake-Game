@@ -1,5 +1,6 @@
 // ─── World ───────────────────────────────────────────────────────────────────
-export const WORLD_SIZE   = 6000
+export const WORLD_SIZE     = 6000
+export const BORDER_MARGIN  = 150   // nothing spawns within this many px of any edge
 export const CHUNK_SIZE   = 600
 export const RENDER_DIST  = 2
 
