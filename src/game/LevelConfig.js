@@ -58,7 +58,7 @@ export const LEVELS = [
     colorHex:    0xff2d78,
     worldSize:   1800,
     borderMargin:100,
-    killTarget:  15,
+    killTarget:  100,
     objectiveText: "Kill 15 enemy snakes to escape",
     maxEnemies:  15,
     enemySpeedMin: 185,

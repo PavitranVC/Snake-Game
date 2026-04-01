@@ -5,7 +5,6 @@ import WorldGenerator from "./WorldGenerator"
 import EnemyManager from "./EnemyManager"
 import ParticleManager from "./ParticleManager"
 import PowerupManager from "./PowerupManager"
-import AnimalManager from "./AnimalManager"
 import { getLevelConfig } from "./LevelConfig"
 import { PLAYER_COLOR, BOOST_COOLDOWN_MS } from "./constants"
 
@@ -30,8 +29,7 @@ export default class SnakeScene extends Phaser.Scene {
     this.worldGenerator  = new WorldGenerator(this, this.foodManager, this.cfg)
     this.snake           = new Snake(this, worldSize / 2, worldSize / 2)
     this.enemyManager    = new EnemyManager(this, this.cfg)
-    this.powerupManager  = new PowerupManager(this, this.snake, this.cfg) // FIX #4: pass cfg
-    this.animalManager   = new AnimalManager(this)                        // FIX #6: instantiate critters
+    this.powerupManager  = new PowerupManager(this, this.snake)
 
     this.enemyManager.registerFoodOverlaps()
 
@@ -62,7 +60,6 @@ export default class SnakeScene extends Phaser.Scene {
     // Forward powerup events
     this.events.on("powerupCollected", (type) => {
       if (this.uiScene?.flashPowerup) this.uiScene.flashPowerup(type)
-      if (this.uiScene?.showPowerup)  this.uiScene.showPowerup(type)  // FIX #5: also trigger banner
     })
   }
 
@@ -71,7 +68,6 @@ export default class SnakeScene extends Phaser.Scene {
     this.snake.update(delta)
     this.worldGenerator.update(this.snake.head.x, this.snake.head.y)
     this.enemyManager.update(this.snake.head)
-    this.animalManager.update(this.snake.head)  // FIX #6: tick critters
     this._handleCombat()
     this._syncUI()
   }
@@ -94,7 +90,6 @@ export default class SnakeScene extends Phaser.Scene {
     const HIT_SQ_HEAD = HIT_HEAD * HIT_HEAD
     const HIT_SQ_BODY = HIT_BODY * HIT_BODY
     const enemies     = this.enemyManager.enemies
-    const playerLen   = this.snake.body.length
 
     for (let i = 0; i < enemies.length; i++) {
       const enemy = enemies[i]
@@ -105,23 +100,13 @@ export default class SnakeScene extends Phaser.Scene {
       const distSqPE = dxPE * dxPE + dyPE * dyPE
 
       if (distSqPE < 600 * 600) {
-        // FIX #8: head-on collision — smaller snake dies; equal size = player dies
-        if (distSqPE < HIT_SQ_HEAD) {
-          if (playerLen >= enemy.body.length) {
-            this._enemyDie(enemy, true)
-          } else {
-            this._playerDie()
-          }
-          return
-        }
+        if (distSqPE < HIT_SQ_HEAD) { this._playerDie(); return }
 
-        // Player head hits enemy body → player dies
         for (const part of enemy.getBodyParts()) {
           const dx = phx - part.x, dy = phy - part.y
           if (dx * dx + dy * dy < HIT_SQ_BODY) { this._playerDie(); return }
         }
 
-        // Enemy head hits player body → enemy dies
         for (const part of this.snake.getBodyParts()) {
           const dx = ehx - part.x, dy = ehy - part.y
           if (dx * dx + dy * dy < HIT_SQ_BODY) {
@@ -133,7 +118,6 @@ export default class SnakeScene extends Phaser.Scene {
 
       if (enemy._isDead) continue
 
-      // Enemy vs enemy combat
       for (let j = i + 1; j < enemies.length; j++) {
         const other = enemies[j]
         if (other._isDead) continue
@@ -192,9 +176,6 @@ export default class SnakeScene extends Phaser.Scene {
       this.sessionScore += 200
       this.sessionKills++
 
-      // FIX #1: hook up the kill feed
-      if (this.uiScene?.addKill) this.uiScene.addKill(enemy.snakeName)
-
       // Check win condition
       if (this.sessionKills >= this.cfg.killTarget && !this._levelDone) {
         this._levelComplete()
@@ -206,15 +187,14 @@ export default class SnakeScene extends Phaser.Scene {
     this._spawnDeathFood(enemy)
     enemy.destroy()
     this.enemyManager.removeEnemy(enemy)
-
-    // FIX #7: don't respawn if level is already done
     this.time.delayedCall(3000, () => {
-      if (!this._levelDone && !this._isDying) this.enemyManager.spawnEnemy()
+      if (!this._levelDone) this.enemyManager.spawnEnemy()
     })
   }
 
   _levelComplete() {
     this._levelDone = true
+    // Last kill explosion + fanfare
     this.cameras.main.flash(400, 255, 255, 100)
     this.cameras.main.shake(300, 0.015)
 
@@ -275,12 +255,11 @@ export default class SnakeScene extends Phaser.Scene {
         boost:         this.snake.boostEnergy,
         boostMax:      this.snake.boostMax,
         onCooldown:    this.snake._boostOnCooldown,
-        cooldownPct:   this.snake._boostCooldownMs > 0          // FIX #2: was `cooldown`, now matches UIScene read key
+        cooldownPct:   this.snake._boostCooldownMs > 0
                          ? this.snake._boostCooldownMs / BOOST_COOLDOWN_MS : 0,
         activePowerup: this.snake.activePowerup,
         levelId:       this.levelId,
         levelColor:    this.cfg.color,
-        worldSize:     this.cfg.worldSize,                       // FIX #3: pass level world size for minimap
       })
     }
   }
