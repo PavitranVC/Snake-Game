@@ -2,10 +2,13 @@ import Phaser from "phaser"
 import { CHUNK_SIZE, RENDER_DIST, WORLD_SIZE, GRID_CELL, BORDER_MARGIN } from "./constants"
 
 export default class WorldGenerator {
-  constructor(scene, foodManager) {
+  constructor(scene, foodManager, cfg = {}) {
     this.scene        = scene
     this.foodManager  = foodManager
     this.activeChunks = new Map()
+    this._worldSize   = cfg.worldSize    ?? WORLD_SIZE
+    this._borderMargin = cfg.borderMargin ?? BORDER_MARGIN
+    this._levelColor  = cfg.colorHex     ?? 0x39ff14
 
     this._buildGridTexture()
     this._buildBorderGlow()
@@ -42,7 +45,7 @@ export default class WorldGenerator {
   }
 
   _buildBorderGlow() {
-    const W = WORLD_SIZE
+    const W = this._worldSize
     const VOID = 4000   // how far the void extends beyond each edge (covers any camera view)
 
     // ── Void panels — solid black rectangles placed outside each world edge ──
@@ -62,20 +65,21 @@ export default class WorldGenerator {
     // ── Neon border glow on the inside face of the void ──
     const gfx = this.scene.add.graphics().setDepth(101)
     // Thick outer glow
-    gfx.lineStyle(12, 0x39ff14, 0.15)
+    gfx.lineStyle(12, this._levelColor, 0.15)
     gfx.strokeRect(0, 0, W, W)
     // Mid glow
-    gfx.lineStyle(6, 0x39ff14, 0.5)
+    gfx.lineStyle(6, this._levelColor, 0.5)
     gfx.strokeRect(3, 3, W - 6, W - 6)
     // Sharp inner line
-    gfx.lineStyle(2, 0x39ff14, 1.0)
+    gfx.lineStyle(2, this._levelColor, 1.0)
     gfx.strokeRect(8, 8, W - 16, W - 16)
     // Inner warning band — danger zone colour fade
     gfx.lineStyle(1, 0xff2d78, 0.2)
-    gfx.strokeRect(BORDER_MARGIN, BORDER_MARGIN, W - BORDER_MARGIN * 2, W - BORDER_MARGIN * 2)
+    gfx.strokeRect(this._borderMargin, BORDER_MARGIN, W - this._borderMargin * 2, W - this._borderMargin * 2)
   }
 
   update(px, py) {
+    const W  = this._worldSize
     const cx = Math.floor(px / CHUNK_SIZE)
     const cy = Math.floor(py / CHUNK_SIZE)
     const needed = new Set()
@@ -100,16 +104,16 @@ export default class WorldGenerator {
     const sy = cy * CHUNK_SIZE
 
     // Clamp to world
-    if (sx < 0 || sy < 0 || sx > WORLD_SIZE || sy > WORLD_SIZE) {
+    if (sx < 0 || sy < 0 || sx > this._worldSize || sy > this._worldSize) {
       this.activeChunks.set(key, objs)
       return
     }
 
     // Clamp spawn area to world interior — nothing within BORDER_MARGIN of any edge
-    const minX = Math.max(sx + 20, BORDER_MARGIN)
-    const maxX = Math.min(sx + CHUNK_SIZE - 20, WORLD_SIZE - BORDER_MARGIN)
-    const minY = Math.max(sy + 20, BORDER_MARGIN)
-    const maxY = Math.min(sy + CHUNK_SIZE - 20, WORLD_SIZE - BORDER_MARGIN)
+    const minX = Math.max(sx + 20, this._borderMargin)
+    const maxX = Math.min(sx + CHUNK_SIZE - 20, this._worldSize - this._borderMargin)
+    const minY = Math.max(sy + 20, this._borderMargin)
+    const maxY = Math.min(sy + CHUNK_SIZE - 20, this._worldSize - this._borderMargin)
 
     // Skip chunk entirely if it falls fully outside the safe zone
     if (minX >= maxX || minY >= maxY) {
@@ -126,10 +130,10 @@ export default class WorldGenerator {
     }
 
     // Neon rock decorations within safe bounds
-    const rockMinX = Math.max(sx + 40, BORDER_MARGIN)
-    const rockMaxX = Math.min(sx + CHUNK_SIZE - 40, WORLD_SIZE - BORDER_MARGIN)
-    const rockMinY = Math.max(sy + 40, BORDER_MARGIN)
-    const rockMaxY = Math.min(sy + CHUNK_SIZE - 40, WORLD_SIZE - BORDER_MARGIN)
+    const rockMinX = Math.max(sx + 40, this._borderMargin)
+    const rockMaxX = Math.min(sx + CHUNK_SIZE - 40, this._worldSize - this._borderMargin)
+    const rockMinY = Math.max(sy + 40, this._borderMargin)
+    const rockMaxY = Math.min(sy + CHUNK_SIZE - 40, this._worldSize - this._borderMargin)
     if (rockMinX < rockMaxX && rockMinY < rockMaxY) {
       const rockCount = Phaser.Math.Between(0, 3)
       for (let i = 0; i < rockCount; i++) {

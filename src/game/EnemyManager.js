@@ -1,19 +1,23 @@
 import Phaser from "phaser"
 import EnemySnake from "./EnemySnake"
-import { MAX_ENEMIES, WORLD_SIZE, BORDER_MARGIN } from "./constants"
+import { WORLD_SIZE, BORDER_MARGIN } from "./constants"
 
 export default class EnemyManager {
-  constructor(scene) {
-    this.scene   = scene
-    this.enemies = []
-    for (let i = 0; i < MAX_ENEMIES; i++) this.spawnEnemy(i)
+  constructor(scene, levelCfg = {}) {
+    this.scene    = scene
+    this.levelCfg = levelCfg
+    this.enemies  = []
+    const max = levelCfg.maxEnemies ?? 8
+    for (let i = 0; i < max; i++) this.spawnEnemy(i)
   }
 
   spawnEnemy(colorIndex = null) {
-    const ci = colorIndex !== null ? colorIndex : this.enemies.length
-    const x = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
-    const y = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
-    const enemy = new EnemySnake(this.scene, x, y, ci)
+    const ci       = colorIndex !== null ? colorIndex : this.enemies.length
+    const worldSize  = this.levelCfg.worldSize  ?? WORLD_SIZE
+    const margin     = this.levelCfg.borderMargin ?? BORDER_MARGIN
+    const x = Phaser.Math.Between(margin, worldSize - margin)
+    const y = Phaser.Math.Between(margin, worldSize - margin)
+    const enemy = new EnemySnake(this.scene, x, y, ci, this.levelCfg)
 
     // Store the collider on the enemy so we can destroy it when the enemy dies.
     // Without this, every respawn adds a new collider that accumulates forever.

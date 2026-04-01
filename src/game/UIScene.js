@@ -18,7 +18,9 @@ export default class UIScene extends Phaser.Scene {
     document.head.appendChild(style)
 
     this._buildScorePanel()
+    this._buildMenuButton()
     this._buildBoostBar()
+    this._buildKillBar()
     this._buildMinimap()
     this._buildKillFeed()
     this._buildPauseButton()
@@ -26,20 +28,15 @@ export default class UIScene extends Phaser.Scene {
     this._buildDeathScreen()
     this._buildPowerupBanner()
 
-    // Listen for player death from SnakeScene
+    // Listen for game events from SnakeScene
     const gameScene = this.scene.get("SnakeScene")
     if (gameScene) {
-      gameScene.events.on("playerDied", data => this._showDeathScreen(data))
+      gameScene.events.on("playerDied",       data => this._showDeathScreen(data))
+      gameScene.events.on("powerupCollected", type => this.flashPowerup(type))
     }
 
     // ESC key toggles pause
     this.input.keyboard.on("keydown-ESC", () => this._togglePause())
-
-    // Powerup collection flash
-    const gameScene = this.scene.get("SnakeScene")
-    if (gameScene) {
-      gameScene.events.on("powerupCollected", type => this.flashPowerup(type))
-    }
   }
 
   // Called every frame from SnakeScene._syncUI
@@ -47,6 +44,7 @@ export default class UIScene extends Phaser.Scene {
     this.stats = s
     this._updateScorePanel()
     this._updateBoostBar()
+    this._updateKillBar()
     this._updateMinimap()
   }
 
@@ -104,6 +102,50 @@ export default class UIScene extends Phaser.Scene {
     this.scoreValue.setText(String(this.stats.score))
     this.lengthValue.setText(String(this.stats.length))
     this.killsValue.setText(String(this.stats.kills))
+  }
+
+  // ─── In-game Menu Button (below score panel, top-left) ──────────────────
+  _buildMenuButton() {
+    // Sits flush below the score card (score card ends at y:120)
+    const mx = 20, my = 128
+    const bg = this.add.graphics().setDepth(20)
+    bg.fillStyle(0x000000, 0.55)
+    bg.fillRoundedRect(mx, my, 100, 26, 6)
+    bg.lineStyle(1, 0x39ff14, 0.35)
+    bg.strokeRoundedRect(mx, my, 100, 26, 6)
+
+    this._inGameMenuBtn = this.add.text(mx + 50, my + 13, "⌂  MENU", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize:   "10px",
+      color:      "#7aaa88",
+      stroke:     "#000",
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(21).setInteractive({ useHandCursor: true })
+
+    this._inGameMenuBtn.on("pointerover", () => {
+      bg.clear()
+      bg.fillStyle(0x0a2010, 0.85)
+      bg.fillRoundedRect(mx, my, 100, 26, 6)
+      bg.lineStyle(1.5, 0x39ff14, 0.8)
+      bg.strokeRoundedRect(mx, my, 100, 26, 6)
+      this._inGameMenuBtn.setStyle({ color: "#39ff14" })
+    })
+    this._inGameMenuBtn.on("pointerout", () => {
+      bg.clear()
+      bg.fillStyle(0x000000, 0.55)
+      bg.fillRoundedRect(mx, my, 100, 26, 6)
+      bg.lineStyle(1, 0x39ff14, 0.35)
+      bg.strokeRoundedRect(mx, my, 100, 26, 6)
+      this._inGameMenuBtn.setStyle({ color: "#7aaa88" })
+    })
+    this._inGameMenuBtn.on("pointerdown", () => {
+      // Resume game first if paused, then go to menu
+      const gameScene = this.scene.get("SnakeScene")
+      if (gameScene) gameScene.scene.resume()
+      this.scene.stop("UIScene")
+      this.scene.stop("SnakeScene")
+      this.scene.start("MenuScene")
+    })
   }
 
   // ─── Boost Bar ────────────────────────────────────────────────────────────
@@ -175,6 +217,83 @@ export default class UIScene extends Phaser.Scene {
       this.boostLabel.setText("BOOST  EMPTY")
         .setStyle({ color: "#ff4400" })
     }
+  }
+
+  // ─── Kill Progress Bar (bottom-left — no overlap with any other element) ──
+  _buildKillBar() {
+    // Sits in the bottom-left corner, above the floor.
+    // Score panel is top-left (y:20–120). Boost bar is bottom-center.
+    // This zone (x:20, y:H-90) is completely clear.
+    const kx = 20, ky = H - 72, kw = 220, kh = 14
+    this._killBarX = kx; this._killBarY = ky
+    this._killBarW = kw; this._killBarH = kh
+
+    // Card background matching score panel style
+    this.killBarCard = this.add.graphics()
+    this.killBarCard.fillStyle(0x000000, 0.55)
+    this.killBarCard.fillRoundedRect(kx - 4, ky - 28, kw + 8, kh + 36, 10)
+
+    this.killBarFill = this.add.graphics()
+
+    this.killBarLabel = this.add.text(kx, ky - 20, "OBJECTIVE", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize:   "9px",
+      color:      "#7aaa88",
+      stroke:     "#000",
+      strokeThickness: 2,
+    })
+
+    this.killBarCount = this.add.text(kx + kw, ky - 20, "0 / ?", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize:   "9px",
+      color:      "#ff2d78",
+      stroke:     "#000",
+      strokeThickness: 2,
+    }).setOrigin(1, 0)
+  }
+
+  _updateKillBar() {
+    const kills  = this.stats.kills      || 0
+    const target = this.stats.killTarget || 5
+    const color  = this.stats.levelColor || "#ff2d78"
+    const pct    = Math.min(1, kills / target)
+
+    // Update card border color to match level
+    const col = Phaser.Display.Color.HexStringToColor(color).color
+    this.killBarCard.clear()
+    this.killBarCard.fillStyle(0x000000, 0.55)
+    this.killBarCard.fillRoundedRect(
+      this._killBarX - 4, this._killBarY - 28,
+      this._killBarW + 8, this._killBarH + 36, 10
+    )
+    this.killBarCard.lineStyle(1.5, col, 0.5)
+    this.killBarCard.strokeRoundedRect(
+      this._killBarX - 4, this._killBarY - 28,
+      this._killBarW + 8, this._killBarH + 36, 10
+    )
+
+    this.killBarCount.setText(`${kills} / ${target}`).setStyle({ color })
+
+    // Fill bar
+    this.killBarFill.clear()
+    if (pct > 0) {
+      this.killBarFill.fillStyle(col, 0.9)
+      this.killBarFill.fillRoundedRect(
+        this._killBarX, this._killBarY, this._killBarW * pct, this._killBarH, 6
+      )
+      // Glow when nearly complete
+      if (pct > 0.8) {
+        this.killBarFill.fillStyle(col, 0.2)
+        this.killBarFill.fillRoundedRect(
+          this._killBarX, this._killBarY, this._killBarW, this._killBarH, 6
+        )
+      }
+    }
+    // Track bg
+    this.killBarFill.lineStyle(1, col, 0.25)
+    this.killBarFill.strokeRoundedRect(
+      this._killBarX, this._killBarY, this._killBarW, this._killBarH, 6
+    )
   }
 
   // ─── Minimap ──────────────────────────────────────────────────────────────
@@ -286,12 +405,27 @@ export default class UIScene extends Phaser.Scene {
       this.deathTitle.setAlpha(0)
       this.deathStats.setAlpha(0)
       this.deathBtn.setAlpha(0)
+      this._menuBtn.setAlpha(0)
+      const levelId = this._lastDeathData?.levelId ?? 1
       this.scene.stop("UIScene")
-      this.scene.start("SnakeScene")
+      this.scene.start("SnakeScene", { levelId })
+    })
+
+    // Menu button on death screen
+    this._menuBtn = this.add.text(W / 2, H / 2 + 130, "⌂  MAIN MENU", {
+      ...tf, fontSize: "14px", color: "#7aaa88",
+      backgroundColor: "#0a1208",
+      padding: { x: 18, y: 8 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(51).setInteractive({ useHandCursor: true })
+    this._menuBtn.on("pointerdown", () => {
+      this.scene.stop("UIScene")
+      this.scene.start("MenuScene")
     })
   }
 
-  _showDeathScreen({ score, kills, length }) {
+  _showDeathScreen(data) {
+    const { score, kills, length } = data
+    this._lastDeathData = data
     this.tweens.add({ targets: this.deathOverlay, alpha: 1, duration: 400 })
     this.tweens.add({ targets: this.deathTitle,   alpha: 1, duration: 500, delay: 200 })
     this.deathStats.setText(
@@ -299,6 +433,7 @@ export default class UIScene extends Phaser.Scene {
     )
     this.tweens.add({ targets: this.deathStats, alpha: 1, duration: 500, delay: 500 })
     this.tweens.add({ targets: this.deathBtn,   alpha: 1, duration: 500, delay: 800 })
+    this.tweens.add({ targets: this._menuBtn,  alpha: 1, duration: 500, delay: 1000 })
   }
 
   // ─── Pause Button (top center) ────────────────────────────────────────────

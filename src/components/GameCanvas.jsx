@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react"
 import Phaser from "phaser"
+import MenuScene from "../game/MenuScene"
 import SnakeScene from "../game/SnakeScene"
 import UIScene from "../game/UIScene"
+import LevelCompleteScene from "../game/LevelCompleteScene"
 
 export default function GameCanvas() {
   const ref = useRef(null)
@@ -20,12 +22,13 @@ export default function GameCanvas() {
       physics: {
         default: "arcade",
         arcade: {
-          debug: false,
-          fixedStep: true,   // deterministic fixed timestep — no speed variance at different fps
-          fps: 60,
+          debug:     false,
+          fixedStep: true,
+          fps:       60,
         },
       },
-      scene: [SnakeScene, UIScene],
+      // MenuScene is first so it loads as the start screen
+      scene: [MenuScene, SnakeScene, UIScene, LevelCompleteScene],
     })
     return () => game.destroy(true)
   }, [])

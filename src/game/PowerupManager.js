@@ -4,17 +4,19 @@ import { POWERUP_TYPES, POWERUP_SPAWN_INTERVAL, POWERUP_LIFETIME, WORLD_SIZE, BO
 /**
  * PowerupManager — spawns, animates and tracks powerup pickups.
  *
- * Each powerup is a plain Image with a physics body. One shared tween
- * pulses all of them (same pattern as FoodManager). A Phaser timer
- * handles periodic spawning. When collected, the effect is applied
- * directly to the Snake instance via snake.applyPowerup(type).
+ * FIX #4: constructor now accepts cfg so powerups spawn within the
+ * level's actual world bounds, not the hardcoded WORLD_SIZE constant.
  */
 export default class PowerupManager {
-  constructor(scene, snake) {
+  constructor(scene, snake, cfg = {}) {
     this.scene  = scene
     this.snake  = snake
     this.group  = scene.physics.add.group()
     this._pulse = { scale: 1.0 }
+
+    // Use level config bounds if provided, fall back to constants
+    this._worldSize    = cfg.worldSize    ?? WORLD_SIZE
+    this._borderMargin = cfg.borderMargin ?? BORDER_MARGIN
 
     this._buildTextures()
     this._buildPulseTween()
@@ -40,12 +42,10 @@ export default class PowerupManager {
       const cx   = size / 2, cy = size / 2
       const g    = this.scene.add.graphics({ x: -99999, y: -99999 })
 
-      // Outer pulse ring
       g.fillStyle(pt.color, 0.08); g.fillCircle(cx, cy, r * 3)
       g.fillStyle(pt.color, 0.2);  g.fillCircle(cx, cy, r * 2.2)
       g.fillStyle(pt.color, 0.5);  g.fillCircle(cx, cy, r * 1.5)
       g.fillStyle(pt.color, 1);    g.fillCircle(cx, cy, r)
-      // Star / diamond shape on top
       g.fillStyle(0xffffff, 0.9)
       g.fillRect(cx - 2, cy - r * 0.7, 4, r * 1.4)
       g.fillRect(cx - r * 0.7, cy - 2, r * 1.4, 4)
@@ -78,17 +78,17 @@ export default class PowerupManager {
       loop:     true,
       callback: () => this._spawnRandom(),
     })
-    // Spawn one immediately so the world doesn't feel empty at start
     this.scene.time.delayedCall(2000, () => this._spawnRandom())
   }
 
   _spawnRandom() {
-    // Max 3 powerups at once — don't litter the world
     if (this.group.getLength() >= 3) return
 
     const type = Phaser.Math.RND.pick(POWERUP_TYPES)
-    const x    = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
-    const y    = Phaser.Math.Between(BORDER_MARGIN, WORLD_SIZE - BORDER_MARGIN)
+
+    // FIX #4: use level-specific bounds instead of hardcoded constants
+    const x = Phaser.Math.Between(this._borderMargin, this._worldSize - this._borderMargin)
+    const y = Phaser.Math.Between(this._borderMargin, this._worldSize - this._borderMargin)
 
     const key  = `powerup_${type.id}`
     const p    = this.scene.add.image(x, y, key).setDepth(7)
@@ -103,10 +103,8 @@ export default class PowerupManager {
 
     this.group.add(p)
 
-    // Auto-despawn after POWERUP_LIFETIME
     this.scene.time.delayedCall(POWERUP_LIFETIME, () => {
       if (p.active) {
-        // Fade out before destroy
         this.scene.tweens.add({
           targets: p, alpha: 0, duration: 400,
           onComplete: () => { if (p.active) { this.group.remove(p, true, true) } }
@@ -124,11 +122,9 @@ export default class PowerupManager {
 
     this.snake.applyPowerup(powerup.powerupId)
 
-    // Flash + destroy
     this.scene.cameras.main.flash(120, 255, 255, 100)
     this.group.remove(powerup, true, true)
 
-    // Notify UI
     this.scene.events.emit("powerupCollected", type)
   }
 }
