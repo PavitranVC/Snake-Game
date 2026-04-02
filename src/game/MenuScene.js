@@ -1,5 +1,6 @@
 import Phaser from "phaser"
 import { LEVELS, getUnlockedLevel } from "./LevelConfig"
+import { getPlayerName, setPlayerName } from "./Leaderboard"
 
 const W = 1280
 const H = 720
@@ -13,6 +14,8 @@ export default class MenuScene extends Phaser.Scene {
     this._buildBackground()
     this._buildTitle()
     this._buildLevelCards()
+    this._buildNameInput()
+    this._buildTopBar()
     this._buildFooter()
     this._animateIn()
   }
@@ -256,6 +259,89 @@ export default class MenuScene extends Phaser.Scene {
     })
   }
 
+  // ─── Name input ──────────────────────────────────────────────────────────
+
+  _buildNameInput() {
+    // HTML input element overlaid on the canvas for name entry
+    // Removed when scene shuts down
+    const existing = document.getElementById("neon_name_input")
+    if (existing) existing.remove()
+
+    const input = document.createElement("input")
+    input.id          = "neon_name_input"
+    input.maxLength   = 12
+    input.placeholder = "YOUR NAME"
+    input.value       = getPlayerName()
+    input.style.cssText = [
+      "position:fixed",
+      "bottom:56px",
+      "right:24px",
+      "width:160px",
+      "background:#050a0f",
+      "border:1px solid #39ff1466",
+      "border-radius:6px",
+      "color:#39ff14",
+      "font-family:'Orbitron',monospace",
+      "font-size:12px",
+      "padding:6px 10px",
+      "outline:none",
+      "text-align:center",
+      "letter-spacing:2px",
+      "text-transform:uppercase",
+      "z-index:999",
+    ].join(";")
+    input.addEventListener("input", () => setPlayerName(input.value))
+    input.addEventListener("focus", () => { input.style.borderColor = "#39ff14" })
+    input.addEventListener("blur",  () => { input.style.borderColor = "#39ff1466" })
+    document.body.appendChild(input)
+    this._nameInput = input
+
+    // Label above input
+    this.add.text(W - 24, H - 76, "PLAYER NAME", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize:   "8px",
+      color:      "#7aaa88",
+      letterSpacing: 3,
+    }).setOrigin(1, 0)
+  }
+
+  // ─── Top bar — leaderboard button ─────────────────────────────────────────
+
+  _buildTopBar() {
+    const lbX = W - 24, lbY = 18
+    const bg = this.add.graphics()
+    bg.fillStyle(0x000000, 0.5)
+    bg.fillRoundedRect(lbX - 172, lbY, 172, 28, 6)
+    bg.lineStyle(1, 0x39ff14, 0.35)
+    bg.strokeRoundedRect(lbX - 172, lbY, 172, 28, 6)
+
+    const lbBtn = this.add.text(lbX - 86, lbY + 14, "🏆  LEADERBOARD", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize:   "10px",
+      color:      "#ffe600",
+      stroke:     "#000",
+      strokeThickness: 2,
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
+
+    lbBtn.on("pointerover", () => lbBtn.setStyle({ color: "#ffffff" }))
+    lbBtn.on("pointerout",  () => lbBtn.setStyle({ color: "#ffe600" }))
+    lbBtn.on("pointerdown", () => {
+      this._cleanupInput()
+      this.cameras.main.fade(200, 0, 0, 0)
+      this.time.delayedCall(200, () => {
+        this.scene.start("LeaderboardScene")
+        this.scene.stop("MenuScene")
+      })
+    })
+  }
+
+  _cleanupInput() {
+    const el = document.getElementById("neon_name_input")
+    if (el) el.remove()
+  }
+
+  // ─── Start level ──────────────────────────────────────────────────────────
+
   update() {
     // Drift the background dots
     for (const dot of this._snakeDots) {
@@ -269,6 +355,7 @@ export default class MenuScene extends Phaser.Scene {
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   _startLevel(levelId) {
+    this._cleanupInput()
     this.cameras.main.fade(300, 0, 0, 0)
     this.time.delayedCall(300, () => {
       this.scene.start("SnakeScene", { levelId })

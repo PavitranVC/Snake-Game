@@ -30,6 +30,7 @@ export default class EnemySnake extends SnakeBase {
     this.target       = null
     this.wanderAngle  = Phaser.Math.FloatBetween(0, Math.PI * 2)
     this._targetTimer = Math.floor(Math.random() * 20)
+    this.score        = 0   // tracked for live leaderboard ranking
 
     for (let i = 0; i < 6; i++) this._addBodySegment()
 
@@ -150,7 +151,7 @@ export default class EnemySnake extends SnakeBase {
     this.label.setPosition(this.head.x, this.head.y - HEAD_RADIUS - 16)
   }
 
-  grow() { this._addBodySegment() }
+  grow() { this._addBodySegment(); this.score += 10 }
 
   destroy() {
     super.destroy()

@@ -4,6 +4,7 @@ import MenuScene from "../game/MenuScene"
 import SnakeScene from "../game/SnakeScene"
 import UIScene from "../game/UIScene"
 import LevelCompleteScene from "../game/LevelCompleteScene"
+import LeaderboardScene from "../game/LeaderboardScene"
 
 export default function GameCanvas() {
   const ref = useRef(null)
@@ -28,7 +29,7 @@ export default function GameCanvas() {
         },
       },
       // MenuScene is first so it loads as the start screen
-      scene: [MenuScene, SnakeScene, UIScene, LevelCompleteScene],
+      scene: [MenuScene, SnakeScene, UIScene, LevelCompleteScene, LeaderboardScene],
     })
     return () => game.destroy(true)
   }, [])

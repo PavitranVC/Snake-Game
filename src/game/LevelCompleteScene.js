@@ -1,5 +1,6 @@
 import Phaser from "phaser"
 import { LEVELS, unlockLevel, getLevelConfig } from "./LevelConfig"
+import { saveScore, getPlayerName } from "./Leaderboard"
 
 const W = 1280
 const H = 720
@@ -23,6 +24,18 @@ export default class LevelCompleteScene extends Phaser.Scene {
 
     // Unlock the next level in localStorage
     if (!isLast) unlockLevel(this.levelId + 1)
+
+    // Save score to leaderboard
+    const playerName = getPlayerName() || "ANONYMOUS"
+    const rank = saveScore({
+      name:      playerName,
+      score:     this.score,
+      kills:     this.kills,
+      length:    this.length,
+      levelId:   this.levelId,
+      levelName: cfg.name,
+    })
+    this._rank = rank
 
     // Background
     this.add.rectangle(W / 2, H / 2, W, H, 0x050a0f)
@@ -94,6 +107,17 @@ export default class LevelCompleteScene extends Phaser.Scene {
       }).setOrigin(0.5).setAlpha(0).setName(`statlbl_${i}`)
     })
 
+    // Rank callout
+    if (this._rank) {
+      this.add.text(W / 2, 375, `🏆  YOU ENTERED THE LEADERBOARD AT RANK #${this._rank}!`, {
+        fontFamily: "'Orbitron', monospace",
+        fontSize:   "12px",
+        color:      "#ffe600",
+        stroke:     "#000",
+        strokeThickness: 3,
+      }).setOrigin(0.5).setAlpha(0).setName("rank_text")
+    }
+
     // Next level unlock banner or "all done"
     if (!isLast) {
       this.add.text(W / 2, 395, `🔓  UNLOCKED: ${nextCfg.name}`, {
@@ -135,7 +159,7 @@ export default class LevelCompleteScene extends Phaser.Scene {
       })
     }
 
-    this._makeBtn(W / 2, 570, "⌂  MAIN MENU", "#7aaa88", 0x7aaa88, () => {
+    this._makeBtn(W / 2 - 130, 570, "⌂  MAIN MENU", "#7aaa88", 0x7aaa88, () => {
       this.cameras.main.fade(250, 0, 0, 0)
       this.time.delayedCall(250, () => {
         this.scene.stop("UIScene")
@@ -179,7 +203,7 @@ export default class LevelCompleteScene extends Phaser.Scene {
 
   _animateIn() {
     const names = [
-      "complete_title", "level_name", "unlock_text",
+      "complete_title", "level_name", "rank_text", "unlock_text",
       "stat_0", "stat_1", "stat_2",
       "statval_0", "statval_1", "statval_2",
       "statlbl_0", "statlbl_1", "statlbl_2",

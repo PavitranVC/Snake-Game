@@ -7,6 +7,7 @@ import ParticleManager from "./ParticleManager"
 import PowerupManager from "./PowerupManager"
 import { getLevelConfig } from "./LevelConfig"
 import { PLAYER_COLOR, BOOST_COOLDOWN_MS } from "./constants"
+import WorldLeaderboard from "./WorldLeaderboard"
 
 export default class SnakeScene extends Phaser.Scene {
   constructor() {
@@ -32,6 +33,9 @@ export default class SnakeScene extends Phaser.Scene {
     this.powerupManager  = new PowerupManager(this, this.snake)
 
     this.enemyManager.registerFoodOverlaps()
+
+    // In-world leaderboard scoreboard — physical object in the game world
+    this.worldLeaderboard = new WorldLeaderboard(this, this.cfg.worldSize, this.cfg.colorHex)
 
     this.cameras.main.startFollow(this.snake.head, true, 0.08, 0.08)
     this.cameras.main.setZoom(1.0)
@@ -154,6 +158,7 @@ export default class SnakeScene extends Phaser.Scene {
   _playerDie() {
     if (this._isDying || this._levelDone) return
     this._isDying = true
+    if (this.worldLeaderboard) this.worldLeaderboard.destroy()
     this.particleManager.deathEffect(this.snake.head.x, this.snake.head.y)
     this._spawnDeathFood(this.snake)
     this.events.emit("playerDied", {
@@ -194,6 +199,7 @@ export default class SnakeScene extends Phaser.Scene {
 
   _levelComplete() {
     this._levelDone = true
+    if (this.worldLeaderboard) this.worldLeaderboard.destroy()
     // Last kill explosion + fanfare
     this.cameras.main.flash(400, 255, 255, 100)
     this.cameras.main.shake(300, 0.015)
@@ -260,7 +266,44 @@ export default class SnakeScene extends Phaser.Scene {
         activePowerup: this.snake.activePowerup,
         levelId:       this.levelId,
         levelColor:    this.cfg.color,
+        liveRanking:   this._computeLiveRanking(),
       })
     }
+  }
+
+  _computeLiveRanking() {
+    // Build a flat list of all snakes (player + enemies) sorted by score desc
+    const all = []
+
+    // Player entry
+    all.push({
+      name:     "YOU",
+      score:    this.sessionScore,
+      length:   this.snake.body.length + 1,
+      colorHex: 0x39ff14,
+      colorStr: "#39ff14",
+      isPlayer: true,
+    })
+
+    // Enemy entries
+    for (const e of this.enemyManager.enemies) {
+      if (e._isDead) continue
+      all.push({
+        name:     e.snakeName,
+        score:    e.score,
+        length:   e.body.length + 1,
+        colorHex: e.colorHex,
+        colorStr: "#" + e.colorHex.toString(16).padStart(6, "0"),
+        isPlayer: false,
+      })
+    }
+
+    // Sort by score descending, use length as tiebreaker
+    all.sort((a, b) => b.score !== a.score ? b.score - a.score : b.length - a.length)
+
+    // Find player rank (1-based)
+    const playerRank = all.findIndex(e => e.isPlayer) + 1
+
+    return { all, playerRank }
   }
 }

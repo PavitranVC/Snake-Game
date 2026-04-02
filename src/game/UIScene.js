@@ -1,5 +1,7 @@
 import Phaser from "phaser"
 import { BOOST_MAX, BOOST_COOLDOWN_MS, WORLD_SIZE, PLAYER_COLOR, ENEMY_COLORS } from "./constants"
+import { saveScore, getPlayerName } from "./Leaderboard"
+import { getLevelConfig } from "./LevelConfig"
 
 const W = 1280
 const H = 720
@@ -22,6 +24,7 @@ export default class UIScene extends Phaser.Scene {
     this._buildBoostBar()
     this._buildKillBar()
     this._buildMinimap()
+    this._buildLiveRankPanel()
     this._buildKillFeed()
     this._buildPauseButton()
     this._buildPauseScreen()
@@ -46,6 +49,7 @@ export default class UIScene extends Phaser.Scene {
     this._updateBoostBar()
     this._updateKillBar()
     this._updateMinimap()
+    this._updateLiveRank()
   }
 
   // Called when player collects a powerup
@@ -343,6 +347,133 @@ export default class UIScene extends Phaser.Scene {
     }
   }
 
+  // ─── Live In-Game Ranking Panel ──────────────────────────────────────────
+  // Position: right column, directly below minimap (minimap ends at y≈165)
+  // Width: 130px matching minimap width. Shows top 5 + player if outside top 5.
+  _buildLiveRankPanel() {
+    const mx = W - 150, my = 168, mw = 130
+    this._lrX = mx; this._lrY = my; this._lrW = mw
+
+    // Card background — same style as minimap
+    this.lrBg = this.add.graphics()
+    this.lrBg.fillStyle(0x000000, 0.65)
+    this.lrBg.fillRoundedRect(mx - 2, my - 2, mw + 4, 228, 8)
+    this.lrBg.lineStyle(1.5, 0x39ff14, 0.35)
+    this.lrBg.strokeRoundedRect(mx - 2, my - 2, mw + 4, 228, 8)
+
+    // Title
+    this.add.text(mx + mw / 2, my + 6, "RANKINGS", {
+      fontFamily: "'Orbitron', monospace",
+      fontSize:   "8px",
+      color:      "#7aaa88",
+      letterSpacing: 3,
+    }).setOrigin(0.5, 0)
+
+    // Divider
+    const div = this.add.graphics()
+    div.lineStyle(1, 0x39ff14, 0.2)
+    div.lineBetween(mx + 4, my + 22, mx + mw - 4, my + 22)
+
+    // 6 row slots: 5 for top 5, 1 for player-if-outside
+    // Each row: rank label + name + score — 32px tall
+    this._lrRows = []
+    for (let i = 0; i < 6; i++) {
+      const ry = my + 28 + i * 32
+
+      // Rank / separator text
+      const rankTxt = this.add.text(mx + 8, ry + 4, "", {
+        fontFamily: "'Orbitron', monospace",
+        fontSize:   "10px",
+        fontStyle:  "bold",
+        color:      "#39ff14",
+        stroke:     "#000",
+        strokeThickness: 2,
+      })
+
+      // Name
+      const nameTxt = this.add.text(mx + 26, ry + 4, "", {
+        fontFamily: "'Orbitron', monospace",
+        fontSize:   "9px",
+        color:      "#aaccaa",
+        stroke:     "#000",
+        strokeThickness: 2,
+      })
+
+      // Score (right-aligned)
+      const scoreTxt = this.add.text(mx + mw - 6, ry + 4, "", {
+        fontFamily: "'Orbitron', monospace",
+        fontSize:   "8px",
+        color:      "#7aaa88",
+        stroke:     "#000",
+        strokeThickness: 2,
+      }).setOrigin(1, 0)
+
+      // Row highlight bg (only visible when player row)
+      const rowBg = this.add.graphics()
+
+      this._lrRows.push({ rankTxt, nameTxt, scoreTxt, rowBg, ry })
+    }
+  }
+
+  _updateLiveRank() {
+    if (!this.stats.liveRanking) return
+    const { all, playerRank } = this.stats.liveRanking
+    const mx = this._lrX, mw = this._lrW
+
+    const RANK_COLS = ["#ffe600", "#aaaaaa", "#ff7c2a", "#aaccaa", "#aaccaa"]
+
+    // Rows 0-4 always show top 5 (or empty if fewer snakes)
+    for (let i = 0; i < 5; i++) {
+      const row   = this._lrRows[i]
+      const entry = all[i]
+
+      row.rowBg.clear()
+
+      if (!entry) {
+        row.rankTxt.setText("")
+        row.nameTxt.setText("")
+        row.scoreTxt.setText("")
+        continue
+      }
+
+      const isPlayer = entry.isPlayer
+      const col = isPlayer ? "#39ff14" : RANK_COLS[i]
+
+      // Highlight player row
+      if (isPlayer) {
+        row.rowBg.fillStyle(0x0a2010, 0.8)
+        row.rowBg.fillRoundedRect(mx, row.ry, mw, 28, 4)
+      }
+
+      row.rankTxt.setText(`${i + 1}`).setStyle({ color: col })
+      // Truncate name to fit: max 8 chars
+      const displayName = isPlayer ? "YOU" : (entry.name || "?").slice(0, 8)
+      row.nameTxt.setText(displayName).setStyle({
+        color:     isPlayer ? "#39ff14" : entry.colorStr || "#aaccaa",
+        fontStyle: isPlayer ? "bold" : "normal",
+      })
+      row.scoreTxt.setText(String(entry.score)).setStyle({ color: col })
+    }
+
+    // Row 5 — show player if outside top 5, else hide
+    const row5 = this._lrRows[5]
+    row5.rowBg.clear()
+
+    if (playerRank > 5) {
+      // Show "..." separator then player row
+      row5.rowBg.fillStyle(0x0a2010, 0.8)
+      row5.rowBg.fillRoundedRect(mx, row5.ry, mw, 28, 4)
+
+      row5.rankTxt.setText("...").setStyle({ color: "#444", fontSize: "8px" })
+      row5.nameTxt.setText("YOU").setStyle({ color: "#39ff14", fontStyle: "bold", fontSize: "9px" })
+      row5.scoreTxt.setText(String(all[playerRank - 1]?.score || 0)).setStyle({ color: "#39ff14" })
+    } else {
+      row5.rankTxt.setText("")
+      row5.nameTxt.setText("")
+      row5.scoreTxt.setText("")
+    }
+  }
+
   // ─── Kill Feed ────────────────────────────────────────────────────────────
   _buildKillFeed() {
     this.killFeedTexts = []
@@ -406,6 +537,7 @@ export default class UIScene extends Phaser.Scene {
       this.deathStats.setAlpha(0)
       this.deathBtn.setAlpha(0)
       this._menuBtn.setAlpha(0)
+      if (this._lbBtn) this._lbBtn.setAlpha(0)
       const levelId = this._lastDeathData?.levelId ?? 1
       this.scene.stop("UIScene")
       this.scene.start("SnakeScene", { levelId })
@@ -419,21 +551,42 @@ export default class UIScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0).setDepth(51).setInteractive({ useHandCursor: true })
     this._menuBtn.on("pointerdown", () => {
       this.scene.stop("UIScene")
+      this.scene.stop("SnakeScene")
       this.scene.start("MenuScene")
+    })
+
+    // Leaderboard button on death screen
+    this._lbBtn = this.add.text(W / 2, H / 2 + 180, "🏆  VIEW LEADERBOARD", {
+      ...tf, fontSize: "12px", color: "#ffe600",
+      backgroundColor: "#1a1400",
+      padding: { x: 16, y: 8 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(51).setInteractive({ useHandCursor: true })
+    this._lbBtn.on("pointerdown", () => {
+      this.scene.stop("UIScene")
+      this.scene.stop("SnakeScene")
+      this.scene.start("LeaderboardScene")
     })
   }
 
   _showDeathScreen(data) {
-    const { score, kills, length } = data
+    const { score, kills, length, levelId } = data
     this._lastDeathData = data
+
+    // Save to leaderboard
+    const name = getPlayerName() || "ANONYMOUS"
+    const cfg  = getLevelConfig(levelId || 1)
+    const rank = saveScore({ name, score, kills, length, levelId: levelId || 1, levelName: cfg.name })
+    this._lastRank = rank
     this.tweens.add({ targets: this.deathOverlay, alpha: 1, duration: 400 })
     this.tweens.add({ targets: this.deathTitle,   alpha: 1, duration: 500, delay: 200 })
+    const rankStr = this._lastRank ? `  ·  RANK #${this._lastRank}` : ""
     this.deathStats.setText(
-      `SCORE: ${score}     LENGTH: ${length}     KILLS: ${kills}`
+      `SCORE: ${score}     LENGTH: ${length}     KILLS: ${kills}${rankStr}`
     )
     this.tweens.add({ targets: this.deathStats, alpha: 1, duration: 500, delay: 500 })
     this.tweens.add({ targets: this.deathBtn,   alpha: 1, duration: 500, delay: 800 })
     this.tweens.add({ targets: this._menuBtn,  alpha: 1, duration: 500, delay: 1000 })
+    this.tweens.add({ targets: this._lbBtn,    alpha: 1, duration: 500, delay: 1100 })
   }
 
   // ─── Pause Button (top center) ────────────────────────────────────────────
