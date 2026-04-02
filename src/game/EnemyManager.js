@@ -45,11 +45,28 @@ export default class EnemyManager {
     }
   }
 
+  getHeadsGroup() {
+    // Returns a Phaser group containing all current enemy heads —
+    // used to register a single terrain collider for all enemies at once
+    if (!this._headsGroup) {
+      this._headsGroup = this.scene.physics.add.group()
+    }
+    // Sync: add any heads not yet in the group
+    for (const e of this.enemies) {
+      if (!this._headsGroup.contains(e.head)) {
+        this._headsGroup.add(e.head)
+      }
+    }
+    return this._headsGroup
+  }
+
   removeEnemy(enemy) {
-    // Destroy the physics collider before removing the enemy — prevents leak
     if (enemy._foodCollider) {
       this.scene.physics.world.removeCollider(enemy._foodCollider)
       enemy._foodCollider = null
+    }
+    if (this._headsGroup && this._headsGroup.contains(enemy.head)) {
+      this._headsGroup.remove(enemy.head)
     }
     this.enemies = this.enemies.filter(e => e !== enemy)
   }

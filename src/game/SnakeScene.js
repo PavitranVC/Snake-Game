@@ -34,6 +34,32 @@ export default class SnakeScene extends Phaser.Scene {
 
     this.enemyManager.registerFoodOverlaps()
 
+    // Bump collision — player hits a terrain bump → die
+    this.physics.add.collider(
+      this.snake.head,
+      this.worldGenerator.terrainGroup,
+      () => { if (!this._isDying && !this._levelDone) this._playerDie() }
+    )
+
+    // Border collision — player hits the edge kill walls → die
+    this.physics.add.collider(
+      this.snake.head,
+      this.worldGenerator.borderGroup,
+      () => { if (!this._isDying && !this._levelDone) this._playerDie() }
+    )
+
+    // Enemy heads bounce off bumps naturally via AI steering
+    this.physics.add.collider(
+      this.enemyManager.getHeadsGroup(),
+      this.worldGenerator.terrainGroup
+    )
+
+    // Enemies also collide with border walls
+    this.physics.add.collider(
+      this.enemyManager.getHeadsGroup(),
+      this.worldGenerator.borderGroup
+    )
+
     // In-world leaderboard scoreboard — physical object in the game world
     this.worldLeaderboard = new WorldLeaderboard(this, this.cfg.worldSize, this.cfg.colorHex)
 
