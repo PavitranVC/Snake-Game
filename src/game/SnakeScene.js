@@ -187,16 +187,17 @@ export default class SnakeScene extends Phaser.Scene {
     if (this.worldLeaderboard) this.worldLeaderboard.destroy()
     this.particleManager.deathEffect(this.snake.head.x, this.snake.head.y)
     this._spawnDeathFood(this.snake)
+
+    // Emit event FIRST so UIScene receives it before any pause
     this.events.emit("playerDied", {
       score:   this.sessionScore,
       kills:   this.sessionKills,
       length:  this.snake.body.length + 1,
       levelId: this.levelId,
     })
-    this.time.delayedCall(600, () => {
-      this.scene.stop("UIScene")
-      this.scene.start("SnakeScene", { levelId: this.levelId })
-    })
+    // Small delay so death particles play, then freeze the world.
+    // UIScene stays active (parallel scene) so buttons remain clickable.
+    this.time.delayedCall(400, () => this.scene.pause())
   }
 
   _enemyDie(enemy, byPlayer = false) {

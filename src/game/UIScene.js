@@ -20,7 +20,6 @@ export default class UIScene extends Phaser.Scene {
     document.head.appendChild(style)
 
     this._buildScorePanel()
-    this._buildMenuButton()
     this._buildBoostBar()
     this._buildKillBar()
     this._buildMinimap()
@@ -106,50 +105,6 @@ export default class UIScene extends Phaser.Scene {
     this.scoreValue.setText(String(this.stats.score))
     this.lengthValue.setText(String(this.stats.length))
     this.killsValue.setText(String(this.stats.kills))
-  }
-
-  // ─── In-game Menu Button (below score panel, top-left) ──────────────────
-  _buildMenuButton() {
-    // Sits flush below the score card (score card ends at y:120)
-    const mx = 20, my = 128
-    const bg = this.add.graphics().setDepth(20)
-    bg.fillStyle(0x000000, 0.55)
-    bg.fillRoundedRect(mx, my, 100, 26, 6)
-    bg.lineStyle(1, 0x39ff14, 0.35)
-    bg.strokeRoundedRect(mx, my, 100, 26, 6)
-
-    this._inGameMenuBtn = this.add.text(mx + 50, my + 13, "⌂  MENU", {
-      fontFamily: "'Orbitron', monospace",
-      fontSize:   "10px",
-      color:      "#7aaa88",
-      stroke:     "#000",
-      strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(21).setInteractive({ useHandCursor: true })
-
-    this._inGameMenuBtn.on("pointerover", () => {
-      bg.clear()
-      bg.fillStyle(0x0a2010, 0.85)
-      bg.fillRoundedRect(mx, my, 100, 26, 6)
-      bg.lineStyle(1.5, 0x39ff14, 0.8)
-      bg.strokeRoundedRect(mx, my, 100, 26, 6)
-      this._inGameMenuBtn.setStyle({ color: "#39ff14" })
-    })
-    this._inGameMenuBtn.on("pointerout", () => {
-      bg.clear()
-      bg.fillStyle(0x000000, 0.55)
-      bg.fillRoundedRect(mx, my, 100, 26, 6)
-      bg.lineStyle(1, 0x39ff14, 0.35)
-      bg.strokeRoundedRect(mx, my, 100, 26, 6)
-      this._inGameMenuBtn.setStyle({ color: "#7aaa88" })
-    })
-    this._inGameMenuBtn.on("pointerdown", () => {
-      // Resume game first if paused, then go to menu
-      const gameScene = this.scene.get("SnakeScene")
-      if (gameScene) gameScene.scene.resume()
-      this.scene.stop("UIScene")
-      this.scene.stop("SnakeScene")
-      this.scene.start("MenuScene")
-    })
   }
 
   // ─── Boost Bar ────────────────────────────────────────────────────────────
@@ -506,157 +461,232 @@ export default class UIScene extends Phaser.Scene {
 
   // ─── Death Screen ─────────────────────────────────────────────────────────
   _buildDeathScreen() {
+    this._deathVisible = false
+
+    // Full overlay
     this.deathOverlay = this.add.graphics().setAlpha(0).setDepth(50)
-    this.deathOverlay.fillStyle(0x000000, 0.85)
+    this.deathOverlay.fillStyle(0x000000, 0.88)
     this.deathOverlay.fillRect(0, 0, W, H)
 
-    const tf = {
-      fontFamily: "'Orbitron', monospace",
-      stroke: "#000",
-      strokeThickness: 4,
-    }
-    this.deathTitle = this.add.text(W / 2, H / 2 - 80, "YOU DIED", {
-      ...tf, fontSize: "52px", fontStyle: "bold", color: "#ff2d78"
-    }).setOrigin(0.5).setAlpha(0).setDepth(51)
+    // Card
+    this.deathCard = this.add.graphics().setAlpha(0).setDepth(51)
+    this.deathCard.fillStyle(0x0a0006, 1)
+    this.deathCard.fillRoundedRect(W/2 - 260, H/2 - 175, 520, 390, 14)
+    this.deathCard.lineStyle(2, 0xff2d78, 0.8)
+    this.deathCard.strokeRoundedRect(W/2 - 260, H/2 - 175, 520, 390, 14)
+    this.deathCard.fillStyle(0xff2d78, 1)
+    this.deathCard.fillRect(W/2 - 260, H/2 - 175, 520, 5)
 
-    this.deathStats = this.add.text(W / 2, H / 2 + 10, "", {
-      ...tf, fontSize: "18px", color: "#39ff14", align: "center"
-    }).setOrigin(0.5).setAlpha(0).setDepth(51)
+    const tf = { fontFamily: "'Orbitron', monospace", stroke: "#000", strokeThickness: 4 }
 
-    this.deathBtn = this.add.text(W / 2, H / 2 + 80, "▶  PLAY AGAIN", {
-      ...tf, fontSize: "22px", color: "#ffe600",
-      backgroundColor: "#1a1a00",
-      padding: { x: 24, y: 10 },
-    }).setOrigin(0.5).setAlpha(0).setDepth(51).setInteractive({ useHandCursor: true })
+    // Title
+    this.deathTitle = this.add.text(W/2, H/2 - 125, "YOU DIED", {
+      ...tf, fontSize: "50px", fontStyle: "bold", color: "#ff2d78"
+    }).setOrigin(0.5).setAlpha(0).setDepth(52)
 
-    this.deathBtn.on("pointerover", () => this.deathBtn.setStyle({ color: "#ffffff" }))
-    this.deathBtn.on("pointerout",  () => this.deathBtn.setStyle({ color: "#ffe600" }))
-    this.deathBtn.on("pointerdown", () => {
-      this.deathOverlay.setAlpha(0)
-      this.deathTitle.setAlpha(0)
-      this.deathStats.setAlpha(0)
-      this.deathBtn.setAlpha(0)
-      this._menuBtn.setAlpha(0)
-      if (this._lbBtn) this._lbBtn.setAlpha(0)
+    // Stats
+    this.deathStats = this.add.text(W/2, H/2 - 48, "", {
+      fontFamily: "'Orbitron', monospace", fontSize: "14px",
+      color: "#aaffaa", stroke: "#000", strokeThickness: 2, align: "center",
+    }).setOrigin(0.5).setAlpha(0).setDepth(52)
+
+    // ▶ PLAY AGAIN
+    this.deathBtn = this.add.text(W/2, H/2 + 36, "▶  PLAY AGAIN", {
+      ...tf, fontSize: "20px", color: "#ffe600",
+      backgroundColor: "#1a1500", padding: { x: 36, y: 14 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(53)
+    .setInteractive({ useHandCursor: true, pixelPerfect: false })
+
+    this.deathBtn.on("pointerover",  () => this.deathBtn.setStyle({ color: "#ffffff" }))
+    this.deathBtn.on("pointerout",   () => this.deathBtn.setStyle({ color: "#ffe600" }))
+    this.deathBtn.on("pointerdown",  () => {
+      this._hideDeathScreen()
       const levelId = this._lastDeathData?.levelId ?? 1
       this.scene.stop("UIScene")
+      this.scene.stop("SnakeScene")
       this.scene.start("SnakeScene", { levelId })
+      this.scene.start("UIScene", { levelId })
     })
 
-    // Menu button on death screen
-    this._menuBtn = this.add.text(W / 2, H / 2 + 130, "⌂  MAIN MENU", {
-      ...tf, fontSize: "14px", color: "#7aaa88",
-      backgroundColor: "#0a1208",
-      padding: { x: 18, y: 8 },
-    }).setOrigin(0.5).setAlpha(0).setDepth(51).setInteractive({ useHandCursor: true })
-    this._menuBtn.on("pointerdown", () => {
+    // ⌂ MAIN MENU
+    this._menuBtn = this.add.text(W/2, H/2 + 108, "⌂  MAIN MENU", {
+      ...tf, fontSize: "16px", color: "#7aaa88",
+      backgroundColor: "#080e08", padding: { x: 30, y: 12 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(53)
+    .setInteractive({ useHandCursor: true, pixelPerfect: false })
+
+    this._menuBtn.on("pointerover",  () => this._menuBtn.setStyle({ color: "#ffffff" }))
+    this._menuBtn.on("pointerout",   () => this._menuBtn.setStyle({ color: "#7aaa88" }))
+    this._menuBtn.on("pointerdown",  () => {
+      this._hideDeathScreen()
       this.scene.stop("UIScene")
       this.scene.stop("SnakeScene")
       this.scene.start("MenuScene")
     })
 
-    // Leaderboard button on death screen
-    this._lbBtn = this.add.text(W / 2, H / 2 + 180, "🏆  VIEW LEADERBOARD", {
-      ...tf, fontSize: "12px", color: "#ffe600",
-      backgroundColor: "#1a1400",
-      padding: { x: 16, y: 8 },
-    }).setOrigin(0.5).setAlpha(0).setDepth(51).setInteractive({ useHandCursor: true })
-    this._lbBtn.on("pointerdown", () => {
+    // 🏆 LEADERBOARD
+    this._lbBtn = this.add.text(W/2, H/2 + 168, "🏆  LEADERBOARD", {
+      ...tf, fontSize: "13px", color: "#ffe600",
+      backgroundColor: "#0e0e00", padding: { x: 24, y: 10 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(53)
+    .setInteractive({ useHandCursor: true, pixelPerfect: false })
+
+    this._lbBtn.on("pointerover",  () => this._lbBtn.setStyle({ color: "#ffffff" }))
+    this._lbBtn.on("pointerout",   () => this._lbBtn.setStyle({ color: "#ffe600" }))
+    this._lbBtn.on("pointerdown",  () => {
+      this._hideDeathScreen()
       this.scene.stop("UIScene")
       this.scene.stop("SnakeScene")
       this.scene.start("LeaderboardScene")
     })
   }
 
+  _hideDeathScreen() {
+    this._deathVisible = false
+    const items = [
+      this.deathOverlay, this.deathCard, this.deathTitle,
+      this.deathStats, this.deathBtn, this._menuBtn, this._lbBtn,
+    ]
+    items.forEach(o => o?.setAlpha(0))
+  }
+
   _showDeathScreen(data) {
     const { score, kills, length, levelId } = data
     this._lastDeathData = data
+    this._deathVisible  = true
 
     // Save to leaderboard
     const name = getPlayerName() || "ANONYMOUS"
     const cfg  = getLevelConfig(levelId || 1)
     const rank = saveScore({ name, score, kills, length, levelId: levelId || 1, levelName: cfg.name })
-    this._lastRank = rank
-    this.tweens.add({ targets: this.deathOverlay, alpha: 1, duration: 400 })
-    this.tweens.add({ targets: this.deathTitle,   alpha: 1, duration: 500, delay: 200 })
-    const rankStr = this._lastRank ? `  ·  RANK #${this._lastRank}` : ""
+    const rankStr = rank ? `  ·  RANK #${rank}` : ""
+
     this.deathStats.setText(
-      `SCORE: ${score}     LENGTH: ${length}     KILLS: ${kills}${rankStr}`
+      `SCORE  ${score}     LENGTH  ${length}     KILLS  ${kills}${rankStr}`
     )
-    this.tweens.add({ targets: this.deathStats, alpha: 1, duration: 500, delay: 500 })
-    this.tweens.add({ targets: this.deathBtn,   alpha: 1, duration: 500, delay: 800 })
-    this.tweens.add({ targets: this._menuBtn,  alpha: 1, duration: 500, delay: 1000 })
-    this.tweens.add({ targets: this._lbBtn,    alpha: 1, duration: 500, delay: 1100 })
+
+    // Staggered fade-in: overlay → card+title → stats → buttons
+    this.tweens.add({ targets: this.deathOverlay, alpha: 1, duration: 300 })
+    this.tweens.add({ targets: [this.deathCard, this.deathTitle], alpha: 1, duration: 350, delay: 150 })
+    this.tweens.add({ targets: this.deathStats,  alpha: 1, duration: 350, delay: 320 })
+    this.tweens.add({
+      targets: [this.deathBtn, this._menuBtn, this._lbBtn],
+      alpha: 1, duration: 350, delay: 500,
+    })
   }
 
   // ─── Pause Button (top center) ────────────────────────────────────────────
   _buildPauseButton() {
-    const tf = {
+    this.pauseBtn = this.add.text(W / 2, 14, "❙❙  PAUSE", {
       fontFamily: "'Orbitron', monospace",
-      fontSize: "11px",
-      color: "#39ff14",
-      stroke: "#000",
+      fontSize:   "11px",
+      color:      "#39ff14",
+      stroke:     "#000",
       strokeThickness: 3,
       backgroundColor: "#061208",
-      padding: { x: 12, y: 7 },
-    }
-    this.pauseBtn = this.add.text(W / 2, 14, "❙❙  PAUSE", tf)
-      .setOrigin(0.5, 0)
-      .setDepth(20)
-      .setInteractive({ useHandCursor: true })
-      .setAlpha(0.75)
-
-    this.pauseBtn.on("pointerover", () => this.pauseBtn.setAlpha(1))
-    this.pauseBtn.on("pointerout",  () => {
-      if (!this.isPaused) this.pauseBtn.setAlpha(0.75)
+      padding: { x: 14, y: 8 },
     })
-    this.pauseBtn.on("pointerdown", () => this._togglePause())
+    .setOrigin(0.5, 0)
+    .setDepth(20)
+    .setAlpha(0.8)
+    .setInteractive({ useHandCursor: true, pixelPerfect: false })
+
+    this.pauseBtn.on("pointerover",  () => this.pauseBtn.setAlpha(1))
+    this.pauseBtn.on("pointerout",   () => { if (!this.isPaused) this.pauseBtn.setAlpha(0.8) })
+    this.pauseBtn.on("pointerdown",  () => this._togglePause())
   }
 
   // ─── Pause Overlay ────────────────────────────────────────────────────────
   _buildPauseScreen() {
     this.isPaused = false
 
-    const tf = {
-      fontFamily: "'Orbitron', monospace",
-      stroke: "#000",
-      strokeThickness: 4,
-    }
-
+    // Dark overlay
     this.pauseOverlay = this.add.graphics().setAlpha(0).setDepth(60)
-    this.pauseOverlay.fillStyle(0x000000, 0.75)
+    this.pauseOverlay.fillStyle(0x000000, 0.82)
     this.pauseOverlay.fillRect(0, 0, W, H)
-    // Neon border box
-    this.pauseOverlay.lineStyle(2, 0x39ff14, 0.5)
-    this.pauseOverlay.strokeRect(W / 2 - 180, H / 2 - 120, 360, 240)
 
-    this.pauseTitle = this.add.text(W / 2, H / 2 - 70, "PAUSED", {
+    // Card background
+    this.pauseCard = this.add.graphics().setAlpha(0).setDepth(61)
+    this.pauseCard.fillStyle(0x080e08, 1)
+    this.pauseCard.fillRoundedRect(W/2 - 210, H/2 - 170, 420, 360, 14)
+    this.pauseCard.lineStyle(2, 0x39ff14, 0.8)
+    this.pauseCard.strokeRoundedRect(W/2 - 210, H/2 - 170, 420, 360, 14)
+    this.pauseCard.fillStyle(0x39ff14, 1)
+    this.pauseCard.fillRect(W/2 - 210, H/2 - 170, 420, 5)
+
+    const tf = { fontFamily: "'Orbitron', monospace", stroke: "#000", strokeThickness: 4 }
+
+    // Title
+    this.pauseTitle = this.add.text(W/2, H/2 - 120, "PAUSED", {
       ...tf, fontSize: "48px", fontStyle: "bold", color: "#39ff14"
-    }).setOrigin(0.5).setAlpha(0).setDepth(61)
+    }).setOrigin(0.5).setAlpha(0).setDepth(62)
 
-    this.pauseHint = this.add.text(W / 2, H / 2 - 10, "Press ESC or click to resume", {
-      ...tf, fontSize: "13px", color: "#aaffaa", strokeThickness: 2
-    }).setOrigin(0.5).setAlpha(0).setDepth(61)
+    this.pauseHint = this.add.text(W/2, H/2 - 64, "Press ESC or tap PAUSE to resume", {
+      fontFamily: "'Orbitron', monospace", fontSize: "10px",
+      color: "#3a6a4a", stroke: "#000", strokeThickness: 2,
+    }).setOrigin(0.5).setAlpha(0).setDepth(62)
 
-    this.resumeBtn = this.add.text(W / 2, H / 2 + 50, "▶  RESUME", {
+    // ▶ RESUME button
+    this.resumeBtn = this.add.text(W/2, H/2, "▶  RESUME", {
       ...tf, fontSize: "22px", color: "#ffe600",
-      backgroundColor: "#1a1a00",
-      padding: { x: 28, y: 12 },
-    }).setOrigin(0.5).setAlpha(0).setDepth(61).setInteractive({ useHandCursor: true })
+      backgroundColor: "#1a1500", padding: { x: 36, y: 14 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(63)
+    .setInteractive({ useHandCursor: true, pixelPerfect: false })
 
-    this.resumeBtn.on("pointerover", () => this.resumeBtn.setStyle({ color: "#ffffff" }))
-    this.resumeBtn.on("pointerout",  () => this.resumeBtn.setStyle({ color: "#ffe600" }))
-    this.resumeBtn.on("pointerdown", () => this._togglePause())
+    this.resumeBtn.on("pointerover",  () => this.resumeBtn.setStyle({ color: "#ffffff" }))
+    this.resumeBtn.on("pointerout",   () => this.resumeBtn.setStyle({ color: "#ffe600" }))
+    this.resumeBtn.on("pointerdown",  () => this._togglePause())
 
-    // Pulse tween on PAUSED title (only runs while visible)
+    // ⌂ MAIN MENU button
+    this.pauseMenuBtn = this.add.text(W/2, H/2 + 76, "⌂  MAIN MENU", {
+      ...tf, fontSize: "18px", color: "#7aaa88",
+      backgroundColor: "#0a100a", padding: { x: 30, y: 12 },
+    }).setOrigin(0.5).setAlpha(0).setDepth(63)
+    .setInteractive({ useHandCursor: true, pixelPerfect: false })
+
+    this.pauseMenuBtn.on("pointerover",  () => this.pauseMenuBtn.setStyle({ color: "#ffffff" }))
+    this.pauseMenuBtn.on("pointerout",   () => this.pauseMenuBtn.setStyle({ color: "#7aaa88" }))
+    this.pauseMenuBtn.on("pointerdown",  () => {
+      this.isPaused = false
+      this.scene.stop("UIScene")
+      this.scene.stop("SnakeScene")
+      this.scene.start("MenuScene")
+    })
+
+    // Pulse tween on title (runs while paused)
     this._pauseTitleTween = this.tweens.add({
       targets: this.pauseTitle,
       alpha: { from: 1, to: 0.4 },
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      paused: true,
+      duration: 900, yoyo: true, repeat: -1, paused: true,
     })
+  }
+
+  _togglePause() {
+    // Block if death screen is visible
+    if (this._deathVisible) return
+
+    const gameScene = this.scene.get("SnakeScene")
+    if (!gameScene) return
+
+    this.isPaused = !this.isPaused
+
+    const pauseItems = [
+      this.pauseCard, this.pauseTitle, this.pauseHint,
+      this.resumeBtn, this.pauseMenuBtn,
+    ]
+
+    if (this.isPaused) {
+      gameScene.scene.pause()
+      this.tweens.add({ targets: this.pauseOverlay, alpha: 1, duration: 200 })
+      this.tweens.add({ targets: pauseItems, alpha: 1, duration: 220, delay: 80 })
+      this._pauseTitleTween.resume()
+      this.pauseBtn.setText("▶  RESUME").setAlpha(1)
+    } else {
+      gameScene.scene.resume()
+      this.tweens.add({ targets: [this.pauseOverlay, ...pauseItems], alpha: 0, duration: 180 })
+      this._pauseTitleTween.pause()
+      this.pauseBtn.setText("❙❙  PAUSE").setAlpha(0.8)
+    }
   }
 
   // ─── Powerup Banner ──────────────────────────────────────────────────────
@@ -695,27 +725,5 @@ export default class UIScene extends Phaser.Scene {
     })
   }
 
-  _togglePause() {
-    const gameScene = this.scene.get("SnakeScene")
-    if (!gameScene) return
-
-    this.isPaused = !this.isPaused
-
-    if (this.isPaused) {
-      // Pause the game scene physics + update
-      gameScene.scene.pause()
-      // Show overlay
-      this.tweens.add({ targets: this.pauseOverlay, alpha: 1, duration: 200 })
-      this.tweens.add({ targets: [this.pauseTitle, this.pauseHint, this.resumeBtn], alpha: 1, duration: 250, delay: 100 })
-      this._pauseTitleTween.resume()
-      this.pauseBtn.setText("▶  RESUME").setAlpha(1)
-    } else {
-      // Resume game scene
-      gameScene.scene.resume()
-      // Hide overlay
-      this.tweens.add({ targets: [this.pauseOverlay, this.pauseTitle, this.pauseHint, this.resumeBtn], alpha: 0, duration: 200 })
-      this._pauseTitleTween.pause()
-      this.pauseBtn.setText("❙❙  PAUSE").setAlpha(0.75)
-    }
-  }
 }
+
