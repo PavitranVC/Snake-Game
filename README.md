@@ -1,16 +1,28 @@
-# React + Vite
+# Snake Game (Neon Snake)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A neon 2D snake arcade game built with Vite, React and Phaser 3: Slither.io-style steering, boost, AI snakes, powerups, a 3-level campaign, a leaderboard and Perlin-noise terrain.
 
-Currently, two official plugins are available:
+```
+npm install
+npm run dev
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Version history
 
-## React Compiler
+`main` is the latest 2D version. Earlier versions are kept as commits, tags and `archive/*` branches.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Tag | Branch | What changed |
+|---|---|---|
+| v0.1 | archive/v0.1-prototype | First prototype |
+| v0.2 | archive/v0.2-snakebase | Shared `SnakeBase`, bigger scene |
+| v0.3 | archive/v0.3-world-gen | World generator and constants updates |
+| v0.4 | archive/v0.4-powerups | Powerups and game overhaul |
+| v0.5 | archive/v0.5-menu-levels | Menu, level config, level-complete scene |
+| v0.6 | archive/v0.6-pre-leaderboard | Snapshot before leaderboard |
+| v0.7 | archive/v0.7-leaderboard | Leaderboard and in-world leaderboard |
+| v0.8 | archive/v0.8-perlin-noise | Perlin-noise terrain |
+| v1.0 | main | Latest 2D version |
 
-## Expanding the ESLint configuration
+`feature/3d-planet` holds an experimental 3D planet-based rewrite.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Design notes and the audit/roadmap are in [docs/](docs/).
